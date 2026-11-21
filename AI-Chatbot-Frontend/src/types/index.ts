@@ -1,4 +1,4 @@
-// Shared API types for the NoticeFlow frontend.
+// Shared API types for the Shikhi Bondhu frontend.
 
 export interface ApiError {
   success: false;

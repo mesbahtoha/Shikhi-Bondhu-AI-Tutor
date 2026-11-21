@@ -1,4 +1,4 @@
-# NoticeFlow Frontend
+# Shikhi Bondhu Frontend
 
 A ready-to-run React + Vite frontend for your notice bot backend.
 

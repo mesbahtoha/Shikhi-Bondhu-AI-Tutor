@@ -1,7 +1,9 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { FaRobot } from 'react-icons/fa';
 import {
   MdChat,
   MdDashboard,
+  MdHome,
   MdLogout,
   MdMessage,
   MdPeople,
@@ -21,6 +23,7 @@ import { ThemeLangControls } from '@/components/ui/ThemeLangControls';
 import { Avatar } from '@/components/ui/Avatar';
 
 const NAV_ITEMS = [
+  { to: '/', label: 'Home', icon: MdHome, end: true },
   { to: '/admin', label: 'Dashboard', icon: MdDashboard, end: true },
   { to: '/admin/users', label: 'Users', icon: MdPeople },
   { to: '/admin/books', label: 'Books (Class 3)', icon: MdStickyNote2 },
@@ -70,13 +73,23 @@ export function AdminLayout() {
         minHeight: 0,
       }}
     >
-      <div className="flex items-center gap-2" style={{ padding: '16px 18px', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
-        <span style={{ color: 'var(--color-primary)', fontSize: 22 }}><MdChat /></span>
+      <Link
+        to="/"
+        className="brand-link"
+        onClick={() => setOpen(false)}
+        aria-label="Shikhi Bondhu home"
+        style={{
+          padding: '14px 18px',
+          borderBottom: '1px solid var(--border-color)',
+          flexShrink: 0,
+        }}
+      >
+        <span className="brand-badge"><FaRobot size={18} /></span>
         <div>
-          <div className="font-bold" style={{ fontSize: 15 }}>NoticeFlow</div>
+          <div className="brand-name" style={{ fontSize: 16 }}>Shikhi Bondhu</div>
           <div className="text-xs text-muted">Admin Panel</div>
         </div>
-      </div>
+      </Link>
 
       <nav className="flex-1 overflow-y-auto scroll-thin" style={{ padding: '10px 8px', minHeight: 0 }}>
         {NAV_ITEMS.map((item) => (
