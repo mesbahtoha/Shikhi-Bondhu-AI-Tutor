@@ -1,6 +1,6 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FaRobot, FaFacebook, FaYoutube, FaEnvelope, FaPhone, FaMapMarkerAlt } from 'react-icons/fa';
-import { MdMenu, MdClose, MdExpandMore, MdDashboard, MdChat, MdLogout, MdPerson } from 'react-icons/md';
+import { MdMenu, MdClose, MdExpandMore, MdDashboard, MdLogout, MdPerson } from 'react-icons/md';
 import { useAuthStore } from '@/store/auth.store';
 import { useEffect, useRef, useState } from 'react';
 import { ThemeLangControls } from '@/components/ui/ThemeLangControls';
@@ -11,11 +11,14 @@ export function PublicLayout() {
   const status = useAuthStore((s) => s.status);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const { t, lang } = useLang();
   const authed = status === 'authenticated' && !!user;
+  // Tutor is a focused study workspace: keep the top navbar, drop the footer.
+  const hideFooter = location.pathname === '/tutor' || location.pathname.startsWith('/tutor/');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -55,7 +58,6 @@ export function PublicLayout() {
           <NavLink to="/books" style={linkStyle} className={linkClass}>{t('nav.books')}</NavLink>
           <NavLink to="/about" style={linkStyle} className={linkClass}>{t('nav.about')}</NavLink>
           <NavLink to="/contact" style={linkStyle} className={linkClass}>{t('nav.contact')}</NavLink>
-          {authed && <NavLink to="/chat" style={linkStyle} className={linkClass}>{t('nav.chat')}</NavLink>}
           {authed && user?.role === 'admin' && <NavLink to="/admin" style={linkStyle} className={linkClass}>{t('nav.dashboard')}</NavLink>}
         </nav>
 
@@ -79,7 +81,6 @@ export function PublicLayout() {
                     <strong>{user?.name}</strong>
                     <span>{user?.email}</span>
                   </div>
-                  <button role="menuitem" onClick={() => go('/chat')}><MdChat size={15} /> {t('nav.chat')}</button>
                   {user?.role === 'admin'
                     ? <button role="menuitem" onClick={() => go('/admin')}><MdDashboard size={15} /> {t('nav.dashboard')}</button>
                     : <button role="menuitem" onClick={() => go('/welcome')}><MdPerson size={15} /> {t('nav.profile')}</button>}
@@ -108,7 +109,6 @@ export function PublicLayout() {
           <Link to="/about" className="nav-link" onClick={close}>{t('nav.about')}</Link>
           <Link to="/contact" className="nav-link" onClick={close}>{t('nav.contact')}</Link>
           <Link to="/help" className="nav-link" onClick={close}>{t('nav.help')}</Link>
-          {authed && <Link to="/chat" className="nav-link" onClick={close}>{t('nav.chat')}</Link>}
           {authed && user?.role === 'admin' && <Link to="/admin" className="nav-link" onClick={close}>{t('nav.dashboard')}</Link>}
           <div className="mobile-menu-divider" />
           {!authed ? (
@@ -129,45 +129,47 @@ export function PublicLayout() {
         <Outlet key={lang} />
       </main>
 
-      <footer className="site-footer">
-        <div className="pg-container footer-grid">
-          <div>
-            <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
-              <span className="brand-badge" style={{ width: 34, height: 34 }}><FaRobot size={15} /></span>
-              <strong style={{ fontFamily: 'Outfit, sans-serif' }}>Shikhi Bondhu</strong>
+      {!hideFooter && (
+        <footer className="site-footer">
+          <div className="pg-container footer-grid">
+            <div>
+              <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
+                <span className="brand-badge" style={{ width: 34, height: 34 }}><FaRobot size={15} /></span>
+                <strong style={{ fontFamily: 'Outfit, sans-serif' }}>Shikhi Bondhu</strong>
+              </div>
+              <p>{t('footer.tag')}</p>
+              <p className="footer-small">{t('footer.made')}</p>
+              <div className="social-row">
+                <a href="https://facebook.com" target="_blank" rel="noreferrer" aria-label="Facebook"><FaFacebook /></a>
+                <a href="https://youtube.com" target="_blank" rel="noreferrer" aria-label="YouTube"><FaYoutube /></a>
+                <a href="mailto:hello@shikhibondhu.app" aria-label="Email"><FaEnvelope /></a>
+              </div>
             </div>
-            <p>{t('footer.tag')}</p>
-            <p className="footer-small">{t('footer.made')}</p>
-            <div className="social-row">
-              <a href="https://facebook.com" target="_blank" rel="noreferrer" aria-label="Facebook"><FaFacebook /></a>
-              <a href="https://youtube.com" target="_blank" rel="noreferrer" aria-label="YouTube"><FaYoutube /></a>
-              <a href="mailto:hello@shikhibondhu.app" aria-label="Email"><FaEnvelope /></a>
+            <div>
+              <h4>{t('footer.explore')}</h4>
+              <Link to="/">{t('nav.home')}</Link>
+              <Link to="/tutor">{t('nav.tutor')}</Link>
+              <Link to="/practice">{t('nav.practice')}</Link>
+              <Link to="/books">{t('nav.books')}</Link>
+            </div>
+            <div>
+              <h4>{t('footer.support')}</h4>
+              <Link to="/about">{t('nav.about')}</Link>
+              <Link to="/contact">{t('nav.contact')}</Link>
+              <Link to="/help">{t('nav.help')}</Link>
+              <Link to="/privacy">{t('nav.privacy')}</Link>
+              {!authed && <Link to="/login">{t('nav.login')}</Link>}
+            </div>
+            <div>
+              <h4>{t('footer.contact')}</h4>
+              <span><FaEnvelope size={12} /> hello@shikhibondhu.app</span>
+              <span><FaPhone size={12} /> +880 1XXX XXXXXX</span>
+              <span><FaMapMarkerAlt size={12} /> Dhaka, Bangladesh</span>
             </div>
           </div>
-          <div>
-            <h4>{t('footer.explore')}</h4>
-            <Link to="/">{t('nav.home')}</Link>
-            <Link to="/tutor">{t('nav.tutor')}</Link>
-            <Link to="/practice">{t('nav.practice')}</Link>
-            <Link to="/books">{t('nav.books')}</Link>
-          </div>
-          <div>
-            <h4>{t('footer.support')}</h4>
-            <Link to="/about">{t('nav.about')}</Link>
-            <Link to="/contact">{t('nav.contact')}</Link>
-            <Link to="/help">{t('nav.help')}</Link>
-            <Link to="/privacy">{t('nav.privacy')}</Link>
-            {!authed && <Link to="/login">{t('nav.login')}</Link>}
-          </div>
-          <div>
-            <h4>{t('footer.contact')}</h4>
-            <span><FaEnvelope size={12} /> hello@shikhibondhu.app</span>
-            <span><FaPhone size={12} /> +880 1XXX XXXXXX</span>
-            <span><FaMapMarkerAlt size={12} /> Dhaka, Bangladesh</span>
-          </div>
-        </div>
-        <div className="footer-bottom">© 2026 Shikhi Bondhu. {t('footer.rights')}</div>
-      </footer>
+          <div className="footer-bottom">© 2026 Shikhi Bondhu. {t('footer.rights')}</div>
+        </footer>
+      )}
     </div>
   );
 }

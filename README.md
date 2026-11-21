@@ -732,7 +732,8 @@ Default mode mapping:
 | --- | --- |
 | `/` | Landing page |
 | `/welcome` | Login / register / continue as guest |
-| `/tutor` | Tutor workspace |
+| `/tutor` | Tutor workspace (guests: temporary chat; signed-in: saved chat history) |
+| `/tutor/:conversationId` | A saved Tutor conversation (formerly "My Chat") |
 | `/books` | Published book catalogue |
 | `/books/:bookId` | Book detail with sample chunks |
 | `/learn` and `/learn/:lessonId` | Lesson slide player |
@@ -740,7 +741,7 @@ Default mode mapping:
 | `/about`, `/contact`, `/help`, `/privacy` | Informational pages |
 | `/login`, `/register`, `/forgot-password`, `/reset-password` | Auth (public-only guard) |
 | `/share/:token` | Shared conversation view |
-| `/chat` and `/chat/:id` | Authenticated chat workspace with SSE |
+| `/chat` and `/chat/:id` | Legacy links; redirect inside Tutor |
 
 ### Admin routes
 

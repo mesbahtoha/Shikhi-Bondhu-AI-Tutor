@@ -9,6 +9,7 @@ import './index.css';
 import './styles/polish.css';
 import './styles/practice.css';
 import './styles/docs.css';
+import './styles/tutor.css';
 
 initTheme();
 

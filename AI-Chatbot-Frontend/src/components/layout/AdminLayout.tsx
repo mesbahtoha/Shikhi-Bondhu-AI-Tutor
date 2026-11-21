@@ -104,12 +104,12 @@ export function AdminLayout() {
 
       <div style={{ padding: 12, borderTop: '1px solid var(--border-color)', flexShrink: 0 }}>
         <NavLink
-          to="/chat"
+          to="/tutor"
           className="flex items-center gap-2"
           style={{ padding: '8px 10px', fontSize: 13.5, color: 'var(--text-secondary)', borderRadius: 8 }}
           onClick={() => setOpen(false)}
         >
-          <MdChat size={16} /> Back to chat app
+          <MdChat size={16} /> Back to Tutor
         </NavLink>
       </div>
 

@@ -26,7 +26,7 @@ export function AdminRoute() {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
   if (user.role !== 'admin') {
-    return <Navigate to="/chat" replace />;
+    return <Navigate to="/tutor" replace />;
   }
   return <Outlet />;
 }
@@ -38,7 +38,7 @@ export function PublicOnlyRoute() {
 
   if (status === 'loading') return <FullPageSpinner label="Loading…" />;
   if (status === 'authenticated' && user) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/chat'} replace />;
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/tutor'} replace />;
   }
   return <Outlet />;
 }

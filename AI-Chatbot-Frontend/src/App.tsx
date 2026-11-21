@@ -1,8 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { PublicLayout } from '@/components/layout/PublicLayout';
-import { AppShell } from '@/components/layout/AppShell';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { ProtectedRoute, AdminRoute, PublicOnlyRoute } from '@/routes/guards';
 import { FullPageSpinner } from '@/components/ui/Spinner';
@@ -16,7 +15,6 @@ const LoginPage = lazy(() => import('@/pages/auth/LoginPage').then((m) => ({ def
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage').then((m) => ({ default: m.RegisterPage })));
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/PasswordPages').then((m) => ({ default: m.ForgotPasswordPage })));
 const ResetPasswordPage = lazy(() => import('@/pages/auth/PasswordPages').then((m) => ({ default: m.ResetPasswordPage })));
-const ChatPage = lazy(() => import('@/pages/chat/ChatPage').then((m) => ({ default: m.ChatPage })));
 const ShareView = lazy(() => import('@/pages/chat/ShareView').then((m) => ({ default: m.ShareView })));
 const WelcomePage = lazy(() => import('@/pages/WelcomePage').then((m) => ({ default: m.WelcomePage })));
 const TutorPage = lazy(() => import('@/pages/TutorPage').then((m) => ({ default: m.TutorPage })));
@@ -46,6 +44,12 @@ const AdminSystem = lazy(() => import('@/pages/admin/System').then((m) => ({ def
 const AdminPractice = lazy(() => import('@/pages/admin/Practice').then((m) => ({ default: m.PracticeAdminPage })));
 
 const PageLoader = () => <FullPageSpinner label="Loading…" />;
+
+/** Old "My Chat" links now open the same conversation inside Tutor. */
+function LegacyChatRedirect() {
+  const { id } = useParams<{ id?: string }>();
+  return <Navigate to={id ? `/tutor/${id}` : '/tutor'} replace />;
+}
 
 export default function App() {
   const initialize = useAuthStore((s) => s.initialize);
@@ -78,6 +82,7 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/welcome" element={<WelcomePage />} />
           <Route path="/tutor" element={<TutorPage />} />
+          <Route path="/tutor/:conversationId" element={<TutorPage />} />
           <Route path="/books" element={<BooksPage />} />
           <Route path="/books/:bookId" element={<BookDetailPage />} />
           <Route path="/learn/:lessonId" element={<LearnPage />} />
@@ -96,13 +101,11 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
           </Route>
           <Route path="/share/:token" element={<ShareView />} />
+          <Route path="/chat" element={<LegacyChatRedirect />} />
+          <Route path="/chat/:id" element={<LegacyChatRedirect />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>
-          <Route element={<AppShell />}>
-            <Route path="/chat" element={<ChatPage />} />
-            <Route path="/chat/:id" element={<ChatPage />} />
-          </Route>
           <Route path="/practice/attempt/:attemptId" element={<PracticeAttemptPage />} />
         </Route>
 

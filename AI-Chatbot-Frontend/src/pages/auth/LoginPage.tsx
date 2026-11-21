@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { FaRobot } from 'react-icons/fa';
 import { MdVisibility, MdVisibilityOff } from 'react-icons/md';
@@ -13,7 +13,6 @@ export function LoginPage() {
   const login = useAuthStore((s) => s.login);
   const loginAdmin = useAuthStore((s) => s.loginAdmin);
   const navigate = useNavigate();
-  const location = useLocation();
   const { lang } = useLang();
   const bn = lang === 'bn';
   const [email, setEmail] = useState('');
@@ -23,8 +22,6 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
-
-  const from = (location.state as { from?: string } | null)?.from;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +35,7 @@ export function LoginPage() {
     try {
       const user = adminMode ? await loginAdmin(email.trim(), password) : await login(email.trim(), password);
       toast.success(bn ? `ফিরে আসায় খুশি, ${user.name}!` : `Welcome back, ${user.name}!`);
-      navigate(from ?? (adminMode ? '/admin' : '/chat'), { replace: true });
+      navigate(adminMode ? '/admin' : '/tutor', { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
