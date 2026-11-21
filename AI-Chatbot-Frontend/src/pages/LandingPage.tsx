@@ -32,11 +32,11 @@ export function LandingPage() {
   };
 
   const steps = bn ? [
-    { n: '১', t: 'Unit, Lesson, Page লেখো', d: 'যেমন: Unit 3, Lesson 5, Page 45' },
+    { n: '১', t: 'তোমার প্রশ্ন লেখো', d: 'যেমন: যেকোনো ধারণা, নিয়ম বা কঠিন সমস্যা' },
     { n: '২', t: 'Activity যোগ করো', d: 'যেমন: Match the requests' },
     { n: '৩', t: 'সহজ বাংলায় শেখো', d: 'অর্থ, উদাহরণ আর ১টি অনুশীলন' },
   ] : [
-    { n: '1', t: 'Write Unit, Lesson, Page', d: 'Example: Unit 3, Lesson 5, Page 45' },
+    { n: '1', t: 'Drop Your Question', d: 'Example: Any concept, rule, or tricky problem' },
     { n: '2', t: 'Add the Activity', d: 'Example: Match the requests' },
     { n: '3', t: 'Learn in easy Bangla', d: 'Meaning, example and 1 practice' },
   ];
@@ -121,10 +121,13 @@ export function LandingPage() {
           <div className="pg-card pg-card-pink-shadow pg-pop-in hero-card">
             <div className="hero-card-top">
               <Mascot size={64} mood="cheer" />
-              <div><strong>{t('action.tryNow')}</strong><p>{bn ? 'Unit 3, Lesson 5, Page 45' : 'Unit 3, Lesson 5, Page 45'}</p></div>
+              <div className="hero-card-copy">
+                <strong>{t('action.tryNow')}</strong>
+                <p>{bn ? 'স্মার্ট শেখার প্রিভিউ · সাথে সাথে স্পষ্টতা' : 'Smart learning preview · Instant clarity'}</p>
+              </div>
             </div>
-            <div className="pg-result-bubble"><span className="pg-result-icon">1</span><div style={{ fontWeight: 700 }}>Unit 3 · Lesson 5 · Page 45 — Match the requests</div></div>
-            <div className="pg-result-bubble correct"><span className="pg-result-icon">OK</span><div>{bn ? 'বইয়ের ঠিক পৃষ্ঠা থেকে ৫টি মিল একসাথে সমাধান, প্রতিটির সহজ বাংলা অর্থ আর শেষে ১টি অনুশীলন। ছবি লাগে না।' : 'All 5 requests matched from the exact page, each reply explained in easy Bangla, plus a quick practice. No photo needed.'}</div></div>
+            <div className="pg-result-bubble"><span className="pg-result-icon">1</span><div style={{ fontWeight: 700 }}>{bn ? 'কঠিন ধারণাকে বাস্তব জীবনের উদাহরণ দিয়ে ভেঙে বুঝিয়ে দাও' : 'Break down a hard idea with a real-life example'}</div></div>
+            <div className="pg-result-bubble correct"><span className="pg-result-icon">OK</span><div>{bn ? 'সহজ ভাষায় পরিষ্কার উত্তর, সাথে বাস্তব জীবনের উদাহরণ আর ১টি দ্রুত যাচাই।' : 'A clear answer in simple words, with a real-life example and one quick check.'}</div></div>
             <button className="pg-btn-candy full" onClick={() => navigate('/tutor')}>{t('action.askTutor')}</button>
           </div>
         </div>
@@ -186,13 +189,13 @@ export function LandingPage() {
         <div className="preview-grid">
           <div className="pg-card pg-card-yellow-shadow preview-card">
             <strong>{bn ? 'একজন শিশু জিজ্ঞেস করে' : 'A child asks'}</strong>
-            <div className="pg-result-bubble"><span className="pg-result-icon">You</span><div style={{ fontWeight: 700 }}>Unit 3 · Lesson 5 · Activity C — Match the requests, Page 45.</div></div>
-            <div className="pg-result-bubble correct"><span className="pg-result-icon">OK</span><div>{bn ? 'শিখি বন্ধু ৫টি মিল একসাথে সমাধান করে, প্রতিটি উত্তর সহজ বাংলায় বোঝায় আর শেষে ১টি অনুশীলন দেয়।' : 'Shikhi Bondhu solves all 5 matches in one go, explains every reply in easy Bangla, and ends with one practice question.'}</div></div>
+            <div className="pg-result-bubble"><span className="pg-result-icon">You</span><div style={{ fontWeight: 700 }}>{bn ? 'মেঘ কীভাবে পানি ধরে রাখে, নিচে পড়ে যায় না?' : 'How do clouds hold water without falling down?'}</div></div>
+            <div className="pg-result-bubble correct"><span className="pg-result-icon">OK</span><div>{bn ? 'সহজ ভাষায় পরিষ্কার উত্তর, সাথে বাস্তব জীবনের উদাহরণ আর ১টি দ্রুত যাচাই।' : 'Clear answer in simple words, backed by a real-life example and one quick check.'}</div></div>
           </div>
           <div className="pg-card preview-card preview-cta">
             <Mascot size={56} />
             <strong>{bn ? 'শিখি বন্ধু অনলাইন' : 'Shikhi Bondhu is online'}</strong>
-            <p className="muted">{bn ? 'ছোট লেখাই যথেষ্ট। নিচে ট্যাপ করে আসল অনুশীলন শুরু করো।' : 'Short text is enough. Tap below to start your practice set.'}</p>
+            <p className="muted">{bn ? 'নিজের ভাষায় স্বাভাবিকভাবে জিজ্ঞেস করো — নিচে ট্যাপ করে অনুশীলন শুরু করো।' : 'Ask naturally in your own words — tap below to start practicing.'}</p>
             <button className="pg-btn-candy full" onClick={() => navigate('/practice')}>{bn ? 'অনুশীলন শুরু করো' : 'Start practicing'}</button>
           </div>
         </div>

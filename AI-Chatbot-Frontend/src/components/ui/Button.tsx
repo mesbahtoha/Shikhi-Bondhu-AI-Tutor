@@ -18,10 +18,12 @@ export function Button({
   className,
   children,
   disabled,
+  type = 'button',
   ...rest
 }: ButtonProps) {
   return (
     <button
+      type={type}
       className={clsx(
         'btn',
         `btn-${variant}`,

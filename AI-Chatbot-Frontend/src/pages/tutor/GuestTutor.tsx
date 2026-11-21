@@ -93,7 +93,13 @@ export function GuestTutor() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    listBooks().then(setBooks).catch(() => setBooks([]));
+    const controller = new AbortController();
+    listBooks(undefined, controller.signal).then(setBooks).catch(() => setBooks([]));
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    return () => abortRef.current?.abort();
   }, []);
 
   const send = async (text: string, options?: { language?: string; mode?: AIMode }) => {
@@ -112,6 +118,7 @@ export function GuestTutor() {
         language,
         subject: subject || undefined,
         bookId: bookId || undefined,
+        signal: controller.signal,
       });
       bumpGuestUsed();
       setTurns((current) => current.map((turn) => (turn.id === id ? { ...turn, response, pending: false } : turn)));
@@ -144,11 +151,14 @@ export function GuestTutor() {
   };
 
   const vote = (id: number, helpful: boolean) => {
-    setTurns((current) => current.map((turn) => {
-      if (turn.id !== id || !turn.response || turn.feedback) return turn;
-      void sendTutorFeedback(turn.response.requestId, helpful);
-      return { ...turn, feedback: helpful ? 'up' : 'down' };
-    }));
+    const target = turns.find((turn) => turn.id === id);
+    if (!target?.response || target.feedback) return;
+    // Keep the network side effect outside the state updater so React's
+    // StrictMode double-render cannot send the same feedback twice.
+    void sendTutorFeedback(target.response.requestId, helpful);
+    setTurns((current) => current.map((turn) => (
+      turn.id === id ? { ...turn, feedback: helpful ? 'up' : 'down' } : turn
+    )));
   };
 
   return (

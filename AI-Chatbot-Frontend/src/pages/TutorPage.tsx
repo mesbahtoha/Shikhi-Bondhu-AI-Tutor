@@ -3,6 +3,7 @@ import { FullPageSpinner } from '@/components/ui/Spinner';
 import { useAuthStore } from '@/store/auth.store';
 import { GuestTutor } from './tutor/GuestTutor';
 import { TutorChatWorkspace } from './tutor/TutorChatWorkspace';
+import '@/styles/tutor.css';
 
 /**
  * Tutor is the single chat home for the app:

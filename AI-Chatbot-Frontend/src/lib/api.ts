@@ -99,15 +99,31 @@ api.interceptors.response.use(
       !original._retried
     ) {
       original._retried = true;
+      if (!tokenStore.refresh) {
+        tokenStore.clear();
+        window.dispatchEvent(new CustomEvent('auth:expired'));
+        throw new ApiRequestError('Session expired. Please log in again.', 401);
+      }
       try {
         refreshInFlight = refreshInFlight ?? refreshAccessToken();
         const token = await refreshInFlight;
         original.headers.Authorization = `Bearer ${token}`;
         return api(original);
-      } catch {
-        tokenStore.clear();
-        window.dispatchEvent(new CustomEvent('auth:expired'));
-        throw new ApiRequestError('Session expired. Please log in again.', 401);
+      } catch (refreshError) {
+        // Only an explicit rejection should end the session. A dropped mobile
+        // connection during refresh must not sign the learner out.
+        const refreshStatus = axios.isAxiosError(refreshError)
+          ? refreshError.response?.status ?? 0
+          : 0;
+        if (refreshStatus === 401 || refreshStatus === 403) {
+          tokenStore.clear();
+          window.dispatchEvent(new CustomEvent('auth:expired'));
+          throw new ApiRequestError('Session expired. Please log in again.', 401);
+        }
+        throw new ApiRequestError(
+          'Network problem while refreshing your session. Please check your connection and try again.',
+          0
+        );
       } finally {
         refreshInFlight = null;
       }
@@ -430,65 +446,114 @@ export function isRouteNotFoundError(error: unknown): boolean {
   return false;
 }
 
-/** Reads an SSE stream from an authenticated POST request. */
+type StreamEvent = { type: string; [key: string]: unknown };
+
+function emitSseFrame(rawEvent: string, onEvent: (event: StreamEvent) => void): void {
+  if (!rawEvent.trim()) return;
+  for (const line of rawEvent.split('\n')) {
+    if (!line.startsWith('data:')) continue;
+    const payload = line.slice(5).trim();
+    if (!payload || payload === '[DONE]') continue;
+    try {
+      const parsed = JSON.parse(payload);
+      if (parsed && typeof parsed === 'object') {
+        onEvent(parsed as StreamEvent);
+      }
+    } catch {
+      // skip malformed frames instead of breaking the whole answer
+    }
+  }
+}
+
+const STREAM_FIRST_BYTE_TIMEOUT_MS = 45000;
+const STREAM_IDLE_TIMEOUT_MS = 30000;
+const STREAM_TIMEOUT_MESSAGE = 'The connection timed out. Please check your internet and try again.';
+
+/**
+ * Reads an SSE stream from an authenticated POST request.
+ *
+ * A mobile connection can silently stall mid-stream (the socket stays open but
+ * no bytes arrive). A watchdog aborts the request after a first-byte / idle
+ * timeout so the UI never hangs forever, while the caller's AbortSignal still
+ * stops generation immediately when the learner taps Stop.
+ */
 export async function streamPost(
   url: string,
   body: unknown,
-  onEvent: (event: { type: string; [key: string]: unknown }) => void,
+  onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal
 ): Promise<void> {
   const token = tokenStore.access;
-  const response = await fetch(`${API_BASE_URL}${url}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(body),
-    signal,
-  });
+  const controller = new AbortController();
+  let timedOut = false;
+  let watchdog: number | null = null;
 
-  if (!response.ok) {
-    let message = `Request failed (${response.status})`;
-    try {
-      const payload = await response.json();
-      if (payload?.message) message = payload.message;
-    } catch {
-      // ignore parse errors
+  const armWatchdog = (ms: number) => {
+    if (watchdog !== null) window.clearTimeout(watchdog);
+    watchdog = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort(new DOMException(STREAM_TIMEOUT_MESSAGE, 'TimeoutError'));
+    }, ms);
+  };
+  const onExternalAbort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  else signal?.addEventListener('abort', onExternalAbort, { once: true });
+
+  armWatchdog(STREAM_FIRST_BYTE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      let message = `Request failed (${response.status})`;
+      try {
+        const payload = await response.json();
+        if (payload?.message) message = payload.message;
+      } catch {
+        // ignore parse errors
+      }
+      throw new ApiRequestError(message, response.status);
     }
-    throw new ApiRequestError(message, response.status);
-  }
 
-  const reader = response.body?.getReader();
-  if (!reader) throw new ApiRequestError('Stream not supported', 0);
+    const reader = response.body?.getReader();
+    if (!reader) throw new ApiRequestError('Stream not supported', 0);
 
-  const decoder = new TextDecoder();
-  let buffer = '';
+    const decoder = new TextDecoder();
+    let buffer = '';
+    armWatchdog(STREAM_IDLE_TIMEOUT_MS);
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      armWatchdog(STREAM_IDLE_TIMEOUT_MS);
+      buffer += decoder.decode(value, { stream: true });
 
-    let newlineIndex: number;
-    while ((newlineIndex = buffer.indexOf('\n\n')) !== -1) {
-      const rawEvent = buffer.slice(0, newlineIndex);
-      buffer = buffer.slice(newlineIndex + 2);
-      if (!rawEvent.trim()) continue;
-
-      for (const line of rawEvent.split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const payload = line.slice(5).trim();
-        if (!payload) continue;
-        try {
-          const parsed = JSON.parse(payload);
-          if (parsed && typeof parsed === 'object') {
-            onEvent(parsed as { type: string; [key: string]: unknown });
-          }
-        } catch {
-          // skip malformed frames
-        }
+      let newlineIndex: number;
+      while ((newlineIndex = buffer.indexOf('\n\n')) !== -1) {
+        const rawEvent = buffer.slice(0, newlineIndex);
+        buffer = buffer.slice(newlineIndex + 2);
+        emitSseFrame(rawEvent, onEvent);
       }
     }
+
+    // Decode any trailing bytes and emit a final frame that arrived without
+    // the usual blank-line terminator.
+    buffer += decoder.decode();
+    emitSseFrame(buffer, onEvent);
+  } catch (error) {
+    if (timedOut) throw new ApiRequestError(STREAM_TIMEOUT_MESSAGE, 0);
+    // Preserve AbortError so callers can show "Generation stopped" cleanly.
+    throw error;
+  } finally {
+    if (watchdog !== null) window.clearTimeout(watchdog);
+    signal?.removeEventListener('abort', onExternalAbort);
   }
 }

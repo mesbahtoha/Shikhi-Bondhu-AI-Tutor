@@ -33,9 +33,12 @@ export function lazyRoute<T extends ComponentType<any>>(
       if (!sessionStorage.getItem(`${RETRY_KEY_PREFIX}${key}`)) {
         sessionStorage.setItem(`${RETRY_KEY_PREFIX}${key}`, '1');
         window.location.reload();
+        // Keep the Suspense fallback visible while the browser reloads. Throwing
+        // here would flash the error boundary for a fraction of a second.
+        return new Promise<{ default: T }>(() => {});
       }
     } catch {
-      // ignore
+      // sessionStorage can be unavailable in private mode; fall through.
     }
 
     throw lastError;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { LessonPlan, TutorSlide } from '@/types';
 import { Button } from '@/components/ui/Button';
 
@@ -160,30 +160,41 @@ function QuizSlide({ slide }: { slide: TutorSlide }) {
 const ALLOWED = new Set(['TITLE', 'EXPLANATION', 'IMAGE', 'DIAGRAM', 'EXAMPLE', 'INTERACTIVE', 'QUIZ', 'SUMMARY']);
 
 export function LessonRenderer({ lesson }: { lesson: LessonPlan }) {
-  const slides = (lesson.slides ?? []).filter((s) => ALLOWED.has(s.type));
+  const slides = useMemo(
+    () => (lesson.slides ?? []).filter((s) => ALLOWED.has(s.type)),
+    [lesson]
+  );
   const [index, setIndex] = useState(0);
+
+  // Switching to a shorter lesson must never leave an out-of-range index
+  // (which previously crashed on `slide.type`).
+  useEffect(() => {
+    setIndex(0);
+  }, [lesson]);
+
   if (!slides.length) return <p className="text-muted">এই পাঠটি এখনো তৈরি হয়নি।</p>;
-  const slide = slides[index];
+  const safeIndex = Math.min(index, slides.length - 1);
+  const slide = slides[safeIndex];
   const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   return (
     <div className="card" style={{ padding: 20, maxWidth: 640 }}>
       <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
-        <span className="text-xs text-muted">স্লাইড {index + 1} / {slides.length}</span>
+        <span className="text-xs text-muted">স্লাইড {safeIndex + 1} / {slides.length}</span>
         <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'var(--bg-surface-2)', margin: '0 12px', overflow: 'hidden' }}>
-          <div style={{ width: `${((index + 1) / slides.length) * 100}%`, height: '100%', background: 'var(--color-primary)', transition: reduced ? 'none' : 'width 0.25s' }} />
+          <div style={{ width: `${((safeIndex + 1) / slides.length) * 100}%`, height: '100%', background: 'var(--color-primary)', transition: reduced ? 'none' : 'width 0.25s' }} />
         </div>
       </div>
       <h3 style={{ fontSize: 18, marginBottom: 10 }}>{lesson.title}</h3>
-      <div key={index}>
+      <div key={safeIndex}>
         <SlideBody slide={slide} />
       </div>
       <div className="flex items-center justify-between" style={{ marginTop: 16 }}>
-        <Button variant="secondary" disabled={index === 0} onClick={() => setIndex((i) => Math.max(0, i - 1))}>
+        <Button variant="secondary" disabled={safeIndex === 0} onClick={() => setIndex((i) => Math.max(0, Math.min(i, slides.length - 1) - 1))}>
           ← আগেরটি
         </Button>
-        {index < slides.length - 1 ? (
-          <Button onClick={() => setIndex((i) => Math.min(slides.length - 1, i + 1))}>পরেরটি →</Button>
+        {safeIndex < slides.length - 1 ? (
+          <Button onClick={() => setIndex((i) => Math.min(slides.length - 1, Math.max(i, 0) + 1))}>পরেরটি →</Button>
         ) : (
           <span className="text-sm font-semibold">🎓 পাঠ শেষ!</span>
         )}

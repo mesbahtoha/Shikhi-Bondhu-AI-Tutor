@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonBox } from '@/components/ui/Skeleton';
 import { getErrorMessage, listPracticeBooks, listPracticeChapters, startPracticeAttempt } from '@/lib/api';
 import type { PracticeBookSummary, PracticeChapterSummary, PracticeQuestionType, PracticeMode } from '@/types';
+import '@/styles/practice.css';
 
 const QUESTION_TYPES: Array<{ value: PracticeQuestionType; label: string; description: string }> = [
   { value: 'mcq', label: 'Multiple Choice', description: 'Pick the correct answer from the options.' },
@@ -36,11 +37,14 @@ export function PracticePage() {
     try {
       const { books } = await listPracticeBooks();
       setBooks(books);
-      if (books.length > 0 && !bookId) setBookId(books[0]._id);
+      // Select the first book once. Keeping `bookId` out of the callback
+      // dependencies avoids re-fetching (and flashing the skeleton) every
+      // time the learner taps a different book.
+      setBookId((current) => current || books[0]?._id || '');
     } catch (error) {
       setBooksError(getErrorMessage(error));
     }
-  }, [bookId]);
+  }, []);
 
   useEffect(() => {
     void loadBooks();
@@ -134,7 +138,12 @@ export function PracticePage() {
             <>
               <h2 style={{ marginTop: 0 }}>Step 1: Choose your book</h2>
               {booksError ? (
-                <EmptyState icon="📚" title="Could not load books" description={booksError} />
+                <div>
+                  <EmptyState icon="📚" title="Could not load books" description={booksError} />
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+                    <Button variant="secondary" onClick={() => void loadBooks()}>Try again</Button>
+                  </div>
+                </div>
               ) : !books ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <SkeletonBox width="100%" height={44} />

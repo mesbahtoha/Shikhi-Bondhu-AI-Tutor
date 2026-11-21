@@ -125,20 +125,24 @@ export function TutorChatWorkspace() {
   useEffect(() => {
     if (conversationId) return;
     let active = true;
-    void loadConversations().then(async () => {
-      if (!active) return;
-      const latest = useChatStore.getState().conversations[0];
-      if (latest) {
-        navigate(`/tutor/${latest._id}`, { replace: true });
-        return;
-      }
-      try {
-        const created = await createConversation('New chat');
-        if (active) navigate(`/tutor/${created._id}`, { replace: true });
-      } catch (error) {
-        if (active) toast.error(getErrorMessage(error));
-      }
-    });
+    void loadConversations()
+      .then(async () => {
+        if (!active) return;
+        const latest = useChatStore.getState().conversations[0];
+        if (latest) {
+          navigate(`/tutor/${latest._id}`, { replace: true });
+          return;
+        }
+        try {
+          const created = await createConversation('New chat');
+          if (active) navigate(`/tutor/${created._id}`, { replace: true });
+        } catch (error) {
+          if (active) toast.error(getErrorMessage(error));
+        }
+      })
+      .catch(() => {
+        // Offline: keep the composer available and let the learner retry.
+      });
     return () => {
       active = false;
     };
@@ -156,7 +160,9 @@ export function TutorChatWorkspace() {
       .finally(() => {
         if (active) setLoading(false);
       });
-    void loadConversations();
+    void loadConversations().catch(() => {
+      // A failed history refresh must not interrupt the open conversation.
+    });
     return () => {
       active = false;
     };
@@ -170,12 +176,18 @@ export function TutorChatWorkspace() {
     }
   }, [conversationId, loading, current, navigate]);
 
-  // Follow the conversation while the learner is at the bottom.
+  // Follow the conversation while the learner is at the bottom. During
+  // streaming this runs every ~80 ms, so use an instant scroll on the next
+  // frame instead of queuing a new smooth animation each time.
   useEffect(() => {
     if (!atBottomRef.current) return;
     const el = scrollRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [messages.length, messages[messages.length - 1]?.content]);
+    if (!el) return;
+    const frame = window.requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: isStreaming ? 'auto' : 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages.length, messages[messages.length - 1]?.content, isStreaming]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -201,13 +213,26 @@ export function TutorChatWorkspace() {
     return () => document.body.classList.remove('drawer-open');
   }, []);
 
+  const scrollFrameRef = useRef<number | null>(null);
   const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-    atBottomRef.current = nearBottom;
-    setShowScrollBtn(!nearBottom);
+    // Scroll fires dozens of times per second on touch devices. Coalesce it to
+    // one state update per animation frame so the chat thread stays smooth.
+    if (scrollFrameRef.current !== null) return;
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      const el = scrollRef.current;
+      if (!el) return;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+      atBottomRef.current = nearBottom;
+      setShowScrollBtn((current) => (current === !nearBottom ? current : !nearBottom));
+    });
   };
+
+  useEffect(() => {
+    return () => {
+      if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
+    };
+  }, []);
 
   const scrollToBottom = () => {
     const el = scrollRef.current;
@@ -219,9 +244,13 @@ export function TutorChatWorkspace() {
 
   const handleRename = async () => {
     if (!conversationId || !renameValue.trim()) return;
-    await renameConversation(conversationId, renameValue.trim());
-    setRenameOpen(false);
-    toast.success('Renamed');
+    try {
+      await renameConversation(conversationId, renameValue.trim());
+      setRenameOpen(false);
+      toast.success('Renamed');
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   };
 
   const handleShare = async () => {
@@ -245,22 +274,35 @@ export function TutorChatWorkspace() {
 
   const handleExport = async (format: 'json' | 'markdown') => {
     if (!conversationId) return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 30000);
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/v1/conversations/${conversationId}/export?format=${format}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('nf_access_token') ?? ''}` } }
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem('nf_access_token') ?? ''}` },
+          signal: controller.signal,
+        }
       );
-      if (!response.ok) throw new Error('Export failed');
+      if (!response.ok) throw new Error('Export failed. Please try again.');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `chat-${conversationId.slice(-8)}.${format === 'markdown' ? 'md' : 'json'}`;
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      link.remove();
+      // Revoking immediately can cancel the download in some mobile browsers.
+      window.setTimeout(() => URL.revokeObjectURL(url), 2000);
       toast.success('Exported');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Export failed');
+      const message = error instanceof DOMException && error.name === 'AbortError'
+        ? 'Export timed out. Please check your connection and try again.'
+        : error instanceof Error ? error.message : 'Export failed';
+      toast.error(message);
+    } finally {
+      window.clearTimeout(timeout);
     }
   };
 
@@ -273,8 +315,12 @@ export function TutorChatWorkspace() {
       danger: true,
     });
     if (!confirmed) return;
-    await deleteConversation(conversationId);
-    navigate('/tutor', { replace: true });
+    try {
+      await deleteConversation(conversationId);
+      navigate('/tutor', { replace: true });
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   };
 
   const sendExample = (text: string) => {

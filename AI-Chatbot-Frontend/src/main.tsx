@@ -9,9 +9,8 @@ import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { API_BASE_URL } from '@/lib/api';
 import './index.css';
 import './styles/polish.css';
-import './styles/practice.css';
-import './styles/docs.css';
-import './styles/tutor.css';
+// Route-specific styles (practice, docs, tutor) are imported by their lazy
+// pages so they are not part of the initial CSS payload.
 
 function addResourceHint(rel: 'preconnect' | 'dns-prefetch', href: string, crossOrigin = false) {
   const link = document.createElement('link');

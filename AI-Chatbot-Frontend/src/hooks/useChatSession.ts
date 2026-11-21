@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { getErrorMessage, streamPost } from '@/lib/api';
 import { useChatStore } from '@/store/chat.store';
@@ -35,6 +35,15 @@ export function useChatSession(conversationId: string) {
   const abortRef = useRef<AbortController | null>(null);
   const isStreaming = useChatStore((s) => s.isStreaming);
 
+  // Leaving a conversation (or the Tutor page) must stop the network stream so
+  // tokens cannot keep updating a chat the learner is no longer looking at.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, [conversationId]);
+
   const handleStream = useCallback(
     async (
       url: string,
@@ -70,7 +79,9 @@ export function useChatSession(conversationId: string) {
         chat.updateLocalMessage(activeId, patch);
         chat.setStreaming(false);
         abortRef.current = null;
-        void chat.loadConversations();
+        // Background refreshes must never surface as an unhandled rejection
+        // when the learner is on a flaky mobile connection.
+        void chat.loadConversations().catch(() => {});
         void useAuthStore.getState().refreshUsage();
       };
 

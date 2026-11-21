@@ -7,6 +7,7 @@ import { SkeletonBox } from '@/components/ui/Skeleton';
 import { ArchitectureDiagram, AiDataFlowDiagram, PitchDeckBlock } from '@/components/docs/Diagram';
 import { getTeamAvatarUrl, getDocsContent, getDocsMeta, getDocsStats } from '@/lib/docs';
 import type { DocsBlock, DocsContent, DocsFeatureRow, PublicDocStats } from '@/types';
+import '@/styles/docs.css';
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */

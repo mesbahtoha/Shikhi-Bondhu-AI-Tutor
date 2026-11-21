@@ -1406,9 +1406,16 @@ html[data-theme='dark'] .blob {
 }
 
 /* ===================== Responsive & mobile layer ===================== */
-html,
-body {
+/* Keep the document as the scroll container. Applying `overflow-x: hidden`
+   to body turns it into a 100%-height nested scroller (because html/body are
+   already height:100%), which breaks full-page scroll restoration and can
+   fight the mobile browser URL bar. `clip` avoids creating that scroller. */
+html {
   overflow-x: hidden;
+}
+
+body {
+  overflow-x: clip;
 }
 
 /* Keyboard focus states */
@@ -2425,6 +2432,12 @@ select.pg-input {
   padding: 12px 14px;
   font-size: 14.5px;
   line-height: 1.5;
+  min-width: 0;
+}
+
+.pg-result-bubble > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .pg-result-bubble.correct {

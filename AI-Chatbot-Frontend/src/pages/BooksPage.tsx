@@ -48,11 +48,25 @@ export function BooksPage() {
   }, [search]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
     setLoading(true);
-    listBooks({ search: debounced || undefined })
-      .then(setBooks)
-      .catch(() => setBooks([]))
-      .finally(() => setLoading(false));
+    listBooks({ search: debounced || undefined }, controller.signal)
+      .then((nextBooks) => {
+        if (active) setBooks(nextBooks);
+      })
+      .catch(() => {
+        // Aborted searches and offline failures both land here; keep the last
+        // useful list instead of flashing a false "no books" state.
+        if (active) setBooks((current) => current);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [debounced]);
 
   const subjects = useMemo(() => Array.from(new Set(books.map((b) => b.subject).filter(Boolean))), [books]);

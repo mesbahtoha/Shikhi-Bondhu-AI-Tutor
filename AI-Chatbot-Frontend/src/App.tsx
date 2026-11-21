@@ -1,4 +1,4 @@
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { PublicLayout } from '@/components/layout/PublicLayout';
@@ -8,12 +8,12 @@ import { FullPageSpinner } from '@/components/ui/Spinner';
 import { useAuthStore } from '@/store/auth.store';
 import { useChatStore } from '@/store/chat.store';
 import { lazyRoute } from '@/lib/lazyRoute';
+import { LandingPage } from '@/pages/LandingPage';
 
-// Route-level code splitting: heavy pages (markdown/katex/highlight.js,
-// admin tables & charts) are loaded on demand so the initial bundle stays small.
-// `lazyRoute` adds retries so a dropped mobile connection does not leave a
-// route stuck on the loading spinner.
-const LandingPage = lazyRoute(() => import('@/pages/LandingPage').then((m) => ({ default: m.LandingPage })), 'landing');
+// The landing page is the most common entry point, so it is bundled eagerly to
+// avoid a second network waterfall before first paint. Every other route is
+// split and loaded on demand. `lazyRoute` adds retries so a dropped mobile
+// connection does not leave a route stuck on the loading spinner.
 const LoginPage = lazyRoute(() => import('@/pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })), 'login');
 const RegisterPage = lazyRoute(() => import('@/pages/auth/RegisterPage').then((m) => ({ default: m.RegisterPage })), 'register');
 const ForgotPasswordPage = lazyRoute(() => import('@/pages/auth/PasswordPages').then((m) => ({ default: m.ForgotPasswordPage })), 'forgot-password');
@@ -46,7 +46,28 @@ const AdminLogs = lazyRoute(() => import('@/pages/admin/Logs').then((m) => ({ de
 const AdminSystem = lazyRoute(() => import('@/pages/admin/System').then((m) => ({ default: m.AdminSystem })), 'admin-system');
 const AdminPractice = lazyRoute(() => import('@/pages/admin/Practice').then((m) => ({ default: m.PracticeAdminPage })), 'admin-practice');
 
-const PageLoader = () => <FullPageSpinner label="Loading…" />;
+/**
+ * Route fallback that offers a manual retry when a chunk download stalls on a
+ * weak mobile connection. The app normally recovers on its own (lazyRoute
+ * retries and reloads once), but this guarantees an escape hatch.
+ */
+function PageLoader() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSlow(true), 9000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return (
+    <div className="flex flex-col items-center justify-center" style={{ minHeight: '50vh', gap: 12, padding: 24, textAlign: 'center' }}>
+      <FullPageSpinner label="Loading…" />
+      {slow && (
+        <button type="button" className="pg-btn-secondary" style={{ width: 'auto' }} onClick={() => window.location.reload()}>
+          Taking too long? Reload
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** Old "My Chat" links now open the same conversation inside Tutor. */
 function LegacyChatRedirect() {

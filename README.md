@@ -164,7 +164,7 @@ Ai-Chatbot/
 │  │  │  └─ rag/                   # book ingestion, extraction, retrieval, embeddings
 │  │  ├─ app.ts                    # Express assembly
 │  │  └─ server.ts                 # Node entry point
-│  ├─ tests/run.ts                 # 44 offline checks
+│  ├─ tests/run.ts                 # 72 offline checks
 │  ├─ api/ · vercel.json · tsconfig.api.json
 │  └─ .env.example
 ├─ AI-Chatbot-Frontend/
@@ -803,7 +803,7 @@ Frontend behavior worth knowing:
 ```bash
 cd AI-Chatbot-Backend
 
-npm run test:tutor       # 44 offline checks: no network, no database
+npm run test:tutor       # 72 offline checks: no network, no database
 npm run typecheck        # tsc --noEmit + serverless API tsconfig
 npm run build            # compile to dist/
 
@@ -825,7 +825,7 @@ npm run build            # type-check + Vite production build
 - Attachment magic-byte checks
 - Quiz schema validation
 
-Expected result: `44 passed, 0 failed`.
+Expected result: `72 passed, 0 failed`.
 
 ---
 

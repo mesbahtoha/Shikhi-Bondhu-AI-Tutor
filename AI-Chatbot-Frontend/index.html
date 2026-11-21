@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#2563eb" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="Shikhi Bondhu, Class 3 English Friend for young learners" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -88,12 +90,18 @@
       Please enable JavaScript to use Shikhi Bondhu.
     </noscript>
     <script>
-      // If the app is still loading after 8 seconds (slow mobile data), give
-      // the learner a clear manual retry instead of a blank/stuck screen.
-      window.setTimeout(function () {
+      // If the app is still loading after 8 seconds (slow mobile data), or the
+      // entry script fails to download, give the learner a clear manual retry
+      // instead of a blank/stuck screen.
+      window.showBootRetry = function () {
         var button = document.getElementById('boot-reload');
         if (button) button.style.display = 'inline-flex';
-      }, 8000);
+      };
+      window.setTimeout(window.showBootRetry, 8000);
+      window.addEventListener('error', function (event) {
+        var target = event.target;
+        if (target && target.tagName === 'SCRIPT') window.showBootRetry();
+      }, true);
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>

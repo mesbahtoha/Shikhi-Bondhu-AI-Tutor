@@ -15,13 +15,16 @@ export interface GuestChatResult {
   tutor: TutorResponse;
 }
 
-export async function guestChat(message: string, options?: { language?: string; subject?: string; bookId?: string }): Promise<TutorResponse> {
+export async function guestChat(
+  message: string,
+  options?: { language?: string; subject?: string; bookId?: string; signal?: AbortSignal }
+): Promise<TutorResponse> {
   const payload = await apiPost<GuestChatResult>('/api/v1/tutor/guest-chat', {
     message,
     ...(options?.language ? { language: options.language } : {}),
     ...(options?.subject ? { subject: options.subject } : {}),
     ...(options?.bookId ? { bookId: options.bookId } : {}),
-  }, { timeout: 90000 });
+  }, { timeout: 90000, signal: options?.signal });
   return payload.tutor;
 }
 
@@ -81,16 +84,22 @@ export async function sendTutorFeedback(requestId: string, helpful: boolean): Pr
   }
 }
 
-export async function listBooks(params?: { subject?: string; search?: string }): Promise<BookInfo[]> {
+export async function listBooks(
+  params?: { subject?: string; search?: string },
+  signal?: AbortSignal
+): Promise<BookInfo[]> {
   const query = new URLSearchParams();
   if (params?.subject) query.set('subject', params.subject);
   if (params?.search) query.set('search', params.search);
-  const payload = await apiGet<{ books: BookInfo[] }>(`/api/v1/books?${query.toString()}`);
+  const payload = await apiGet<{ books: BookInfo[] }>(`/api/v1/books?${query.toString()}`, { signal });
   return payload.books ?? [];
 }
 
-export async function getBook(id: string): Promise<{ book: BookInfo; samples: { chunkId: string; chapterTitle?: string; pageStart?: number; pageEnd?: number; preview: string }[] }> {
-  return apiGet(`/api/v1/books/${id}`);
+export async function getBook(
+  id: string,
+  signal?: AbortSignal
+): Promise<{ book: BookInfo; samples: { chunkId: string; chapterTitle?: string; pageStart?: number; pageEnd?: number; preview: string }[] }> {
+  return apiGet(`/api/v1/books/${id}`, { signal });
 }
 
 // ---- Admin ----

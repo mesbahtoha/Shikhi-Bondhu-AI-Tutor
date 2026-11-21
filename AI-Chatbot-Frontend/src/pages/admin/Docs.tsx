@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Form';
 import { SkeletonBox } from '@/components/ui/Skeleton';
 import { getTeamAvatarUrl } from '@/lib/docs';
+import '@/styles/docs.css';
 import {
   addDocTeamMember,
   deleteDocTeamMember,

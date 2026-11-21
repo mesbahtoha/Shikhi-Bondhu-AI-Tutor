@@ -27,17 +27,35 @@ export function BookDetailPage() {
 
   useEffect(() => {
     if (!bookId) return;
-    getBook(bookId)
-      .then((r) => { setBook(r.book); })
-      .catch(() => setError(bn ? 'বইটি পাওয়া যায়নি।' : 'Book not found.'));
-    listBooks().then((all) => setRelated(all.filter((b) => b._id !== bookId).slice(0, 3))).catch(() => setRelated([]));
-  }, [bookId, bn]);
+    const controller = new AbortController();
+    let active = true;
+    setBook(null);
+    setError('');
+    getBook(bookId, controller.signal)
+      .then((r) => {
+        if (active) setBook(r.book);
+      })
+      .catch(() => {
+        if (active) setError('Book not found.');
+      });
+    listBooks(undefined, controller.signal)
+      .then((all) => {
+        if (active) setRelated(all.filter((b) => b._id !== bookId).slice(0, 3));
+      })
+      .catch(() => {
+        if (active) setRelated([]);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [bookId]);
 
   if (error) {
     return (
       <div className="pg-app" style={{ padding: 24 }}>
         <div className="pg-container" style={{ maxWidth: 720 }}>
-          <p>Note: {error}</p>
+          <p>{bn ? 'বইটি পাওয়া যায়নি।' : error}</p>
           <Link to="/books" className="pg-btn-secondary">{bn ? 'সব বই' : 'All books'}</Link>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal';
 import { checkPracticeAnswer, getErrorMessage, getPracticeAttempt, savePracticeAnswers, submitPracticeAnswers } from '@/lib/api';
 import { SkeletonBox } from '@/components/ui/Skeleton';
 import type { AttemptQuestion, PracticeAttempt, QuestionResult, StudentQuestionPayload } from '@/types';
+import '@/styles/practice.css';
 
 function payloadText(payload: StudentQuestionPayload | null | undefined): string {
   if (!payload || typeof payload !== 'object') return 'Question';
@@ -77,6 +78,37 @@ function formatClock(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+/**
+ * The countdown owns its one-second tick. Keeping it out of the attempt page
+ * means a running exam does not re-render every question card every second.
+ */
+function ExamCountdown({ expiresAt, onExpire }: { expiresAt: string; onExpire: () => void }) {
+  const expiresAtMs = useMemo(() => new Date(expiresAt).getTime(), [expiresAt]);
+  const [now, setNow] = useState(() => Date.now());
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [expiresAtMs]);
+
+  const remainingSeconds = Math.max(0, Math.floor((expiresAtMs - now) / 1000));
+
+  useEffect(() => {
+    if (remainingSeconds <= 0 && !firedRef.current) {
+      firedRef.current = true;
+      onExpire();
+    }
+  }, [remainingSeconds, onExpire]);
+
+  return (
+    <Badge variant={remainingSeconds <= 60 ? 'danger' : 'warning'}>
+      ⏱ {formatClock(remainingSeconds)} left
+    </Badge>
+  );
 }
 
 function BackToPractice({ style }: { style?: CSSProperties }) {
@@ -168,7 +200,7 @@ export function PracticeAttemptPage() {
     }
   }, [attemptId, load]);
 
-  const setAnswer = (questionId: string, value: unknown) => {
+  const setAnswer = useCallback((questionId: string, value: unknown) => {
     setAnswers((current) => ({ ...current, [questionId]: value }));
     setCheckResults((current) => {
       if (!(questionId in current)) return current;
@@ -176,9 +208,9 @@ export function PracticeAttemptPage() {
       delete next[questionId];
       return next;
     });
-  };
+  }, []);
 
-  const checkQuestion = async (questionId: string) => {
+  const checkQuestion = useCallback(async (questionId: string) => {
     if (!attemptId) return;
     setCheckingId(questionId);
     try {
@@ -189,12 +221,14 @@ export function PracticeAttemptPage() {
     } finally {
       setCheckingId(null);
     }
-  };
+  }, [attemptId]);
 
   // Auto-save drafts (exam) - skip the initial hydration write.
   const hydratedRef = useRef(false);
   useEffect(() => {
-    if (loading || !attempt) return;
+    // Never write a draft after the attempt has been submitted; that would
+    // produce a pointless (and confusing) error toast on the result screen.
+    if (loading || !attempt || attempt.status !== 'in_progress') return;
     if (!hydratedRef.current) {
       hydratedRef.current = true;
       return;
@@ -211,26 +245,11 @@ export function PracticeAttemptPage() {
   );
   const isExam = attempt?.mode === 'exam';
 
-  // Countdown ticks once a second while an exam is running.
-  const [now, setNow] = useState(() => Date.now());
-  const expiresAtMs = attempt?.expiresAt && attempt.status === 'in_progress' ? new Date(attempt.expiresAt).getTime() : null;
-  useEffect(() => {
-    if (expiresAtMs === null) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [expiresAtMs]);
-  const remainingSeconds = expiresAtMs === null ? null : Math.max(0, Math.floor((expiresAtMs - now) / 1000));
-
-  // Auto-submit when the exam timer expires. The server re-checks the deadline.
-  const autoSubmitRef = useRef(false);
-  useEffect(() => {
-    if (!isExam || !attempt || attempt.status === 'submitted' || remainingSeconds === null) return;
-    if (remainingSeconds <= 0 && !autoSubmitRef.current) {
-      autoSubmitRef.current = true;
-      void submit();
-    }
-  }, [isExam, attempt, remainingSeconds, submit]);
+  // The active deadline is handed to a small child component that owns the
+  // one-second tick and auto-submits through `submit()`.
+  const activeExpiresAt = isExam && attempt?.expiresAt && attempt.status === 'in_progress'
+    ? attempt.expiresAt
+    : null;
 
   if (loading) {
     return (
@@ -311,9 +330,7 @@ export function PracticeAttemptPage() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            {remainingSeconds !== null && (
-              <Badge variant={remainingSeconds <= 60 ? 'danger' : 'warning'}>⏱ {formatClock(remainingSeconds)} left</Badge>
-            )}
+            {activeExpiresAt && <ExamCountdown expiresAt={activeExpiresAt} onExpire={submit} />}
             <Badge variant="info">{answeredQuestions}/{questions.length} answered</Badge>
           </div>
         </div>
@@ -338,11 +355,11 @@ export function PracticeAttemptPage() {
                 question={question}
                 index={index}
                 value={answers[question.questionId]}
-                onChange={(value) => setAnswer(question.questionId, value)}
+                onChange={setAnswer}
                 showFeedback={attempt.mode === 'practice'}
                 checkResult={checkResults[question.questionId]}
                 checking={checkingId === question.questionId}
-                onCheck={() => void checkQuestion(question.questionId)}
+                onCheck={checkQuestion}
               />
             ))}
           </div>
@@ -409,12 +426,12 @@ interface AttemptQuestionCardProps {
   question: AttemptQuestion;
   index: number;
   value: unknown;
-  onChange: (value: unknown) => void;
+  onChange: (questionId: string, value: unknown) => void;
   /** Practice mode shows a "Check" button and the server's feedback. */
   showFeedback?: boolean;
   checkResult?: QuestionResult;
   checking?: boolean;
-  onCheck?: () => void;
+  onCheck?: (questionId: string) => void;
 }
 
 function SelectableOption({
@@ -470,7 +487,16 @@ function SelectableOption({
   );
 }
 
-function AttemptQuestionCard({ question, index, value, onChange, showFeedback = false, checkResult, checking = false, onCheck }: AttemptQuestionCardProps) {
+const AttemptQuestionCard = memo(function AttemptQuestionCard({
+  question,
+  index,
+  value,
+  onChange,
+  showFeedback = false,
+  checkResult,
+  checking = false,
+  onCheck,
+}: AttemptQuestionCardProps) {
   const id = `attempt-q-${question.questionId}`;
   const current = (value ?? {}) as Record<string, unknown>;
 
@@ -484,9 +510,9 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {options.map((option, optionIndex) => (
             <SelectableOption
-              key={option}
+              key={`${optionIndex}-${option}`}
               selected={selectedIndex === optionIndex}
-              onClick={() => onChange({ optionIndex })}
+              onClick={() => onChange(question.questionId, { optionIndex })}
             >
               {option}
             </SelectableOption>
@@ -497,7 +523,12 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
     }
 
     case 'fill_blank': {
-      const text = payloadText(question.payload);
+      // Keep the raw {{n}} markers here: payloadText() shows them as "____"
+      // for display, but the input builder needs the markers to count blanks.
+      const rawText = typeof (question.payload as { text?: unknown }).text === 'string'
+        ? String((question.payload as { text: string }).text)
+        : payloadText(question.payload);
+      const text = rawText;
       const blanks = splitFillBlanks(text);
       const studentBlanks = Array.isArray((current as { blanks?: string[] }).blanks) ? ((current as { blanks?: string[] }).blanks as string[]) : blanks.map(() => '');
       content = (
@@ -520,7 +551,7 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
                 onChange={(event) => {
                   const next = [...studentBlanks];
                   next[blankIndex] = event.target.value;
-                  onChange({ blanks: next });
+                  onChange(question.questionId, { blanks: next });
                 }}
               />
             </label>
@@ -534,8 +565,8 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
       const boolValue = typeof current.value === 'boolean' ? current.value : null;
       content = (
         <div style={{ display: 'flex', gap: 10, flexDirection: 'column' }}>
-          <SelectableOption selected={boolValue === true} onClick={() => onChange({ value: true })}>True</SelectableOption>
-          <SelectableOption selected={boolValue === false} onClick={() => onChange({ value: false })}>False</SelectableOption>
+          <SelectableOption selected={boolValue === true} onClick={() => onChange(question.questionId, { value: true })}>True</SelectableOption>
+          <SelectableOption selected={boolValue === false} onClick={() => onChange(question.questionId, { value: false })}>False</SelectableOption>
         </div>
       );
       break;
@@ -556,10 +587,10 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
       const setPair = (leftId: string, rightId: string) => {
         const next = pairs.filter((pair) => pair.leftId !== leftId);
         next.push({ leftId, rightId });
-        onChange({ ...current, pairs: next });
+        onChange(question.questionId, { ...current, pairs: next });
       };
       const removePair = (leftId: string) => {
-        onChange({ ...current, pairs: pairs.filter((pair) => pair.leftId !== leftId) });
+        onChange(question.questionId, { ...current, pairs: pairs.filter((pair) => pair.leftId !== leftId) });
       };
 
       content = (
@@ -576,7 +607,7 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
                   <SelectableOption
                     key={item.id}
                     selected={selectedLeftId === item.id}
-                    onClick={() => onChange({ ...current, leftId: item.id, rightId: null })}
+                    onClick={() => onChange(question.questionId, { ...current, leftId: item.id, rightId: null })}
                   >
                     {item.text}
                   </SelectableOption>
@@ -629,7 +660,7 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
             className="input"
             type="text"
             value={text}
-            onChange={(event) => onChange({ text: event.target.value })}
+            onChange={(event) => onChange(question.questionId, { text: event.target.value })}
             placeholder="Type one word…"
             autoComplete="off"
             autoCapitalize="none"
@@ -656,7 +687,7 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
             className="textarea"
             rows={3}
             value={text}
-            onChange={(event) => onChange({ text: event.target.value })}
+            onChange={(event) => onChange(question.questionId, { text: event.target.value })}
             placeholder="Type the translation here…"
             autoComplete="off"
             spellCheck={false}
@@ -671,23 +702,33 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
       const items = Array.isArray((question.payload as { items?: Array<{ id: string; text: string }> }).items)
         ? ((question.payload as { items: Array<{ id: string; text: string }> }).items ?? [])
         : [];
-      const order = Array.isArray((current as { order?: string[] }).order) ? ((current as { order: string[] }).order ?? []) : items.map((item) => item.id);
+      const itemById = new Map(items.map((item) => [item.id, item]));
+      // The stored order is the source of truth. Fall back to the shuffled
+      // payload order until the learner presses an arrow for the first time.
+      const rawOrder = Array.isArray((current as { order?: string[] }).order)
+        ? ((current as { order: string[] }).order ?? [])
+        : items.map((item) => item.id);
+      const order = rawOrder.filter((itemId) => itemById.has(itemId));
+      for (const item of items) {
+        if (!order.includes(item.id)) order.push(item.id);
+      }
+      const orderedItems = order.map((itemId) => itemById.get(itemId)!).filter(Boolean);
       const move = (index: number, direction: -1 | 1) => {
         const next = [...order];
         const target = index + direction;
         if (target < 0 || target >= next.length) return;
         [next[index], next[target]] = [next[target], next[index]];
-        onChange({ order: next });
+        onChange(question.questionId, { order: next });
       };
       content = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>
             Use the arrow buttons to move each word into the correct order.
           </p>
-          {items.map((item, index) => (
+          {orderedItems.map((item, index) => (
             <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontWeight: 700, minWidth: 24 }}>{index + 1}.</span>
-              <span style={{ flex: 1 }}>{item.text}</span>
+              <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{item.text}</span>
               <button type="button" className="pg-btn-secondary" aria-label={`Move ${item.text} up`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button>
               <button type="button" className="pg-btn-secondary" aria-label={`Move ${item.text} down`} disabled={index === order.length - 1} onClick={() => move(index, 1)}>↓</button>
             </div>
@@ -712,14 +753,14 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
       {showFeedback && onCheck && (
         <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div>
-            <Button variant="secondary" onClick={onCheck} loading={checking}>Check my answer</Button>
+            <Button variant="secondary" onClick={() => onCheck(question.questionId)} loading={checking}>Check my answer</Button>
           </div>
           {checkResult && <PracticeFeedback result={checkResult} />}
         </div>
       )}
     </div>
   );
-}
+});
 
 function PracticeFeedback({ result }: { result: QuestionResult }) {
   if (!result.answered) {
