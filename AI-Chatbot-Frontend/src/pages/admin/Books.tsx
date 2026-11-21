@@ -61,6 +61,7 @@ export function AdminBooks() {
   const [busy, setBusy] = useState('');
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [staleBackend, setStaleBackend] = useState(false);
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const PAGE_SIZE = 20;
   const pageCount = Math.max(1, Math.ceil(books.length / PAGE_SIZE));
@@ -93,10 +94,14 @@ export function AdminBooks() {
   }, []);
 
   const openDetail = async (id: string) => {
+    if (openingId) return;
+    setOpeningId(id);
     try {
       setDetail(await adminGetBook(id));
     } catch (e) {
       toast.error(getErrorMessage(e));
+    } finally {
+      setOpeningId(null);
     }
   };
 
@@ -201,8 +206,15 @@ export function AdminBooks() {
               {visibleBooks.map((b) => (
                 <tr key={b._id} style={{ borderTop: '1px solid var(--border-color)' }}>
                   <td style={{ padding: 10 }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => void openDetail(b._id)} style={{ padding: 0 }}>
-                      {b.title}
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => void openDetail(b._id)}
+                      disabled={openingId !== null}
+                      aria-busy={openingId === b._id}
+                      style={{ padding: 0 }}
+                    >
+                      {openingId === b._id ? 'খোলা হচ্ছে…' : b.title}
                     </button>
                     <div className="text-xs text-muted">{b.grade} • {b.curriculum}{b.edition ? ` • ${b.edition}` : ''}</div>
                   </td>
