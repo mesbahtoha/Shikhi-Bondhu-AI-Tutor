@@ -9,19 +9,25 @@ import { checkPracticeAnswer, getErrorMessage, getPracticeAttempt, savePracticeA
 import { SkeletonBox } from '@/components/ui/Skeleton';
 import type { AttemptQuestion, PracticeAttempt, QuestionResult, StudentQuestionPayload } from '@/types';
 
-function payloadText(payload: StudentQuestionPayload): string {
+function payloadText(payload: StudentQuestionPayload | null | undefined): string {
+  if (!payload || typeof payload !== 'object') return 'Question';
   const p = payload as unknown as Record<string, unknown>;
   if (typeof p.question === 'string') return p.question;
   if (typeof p.statement === 'string') return p.statement;
   if (typeof p.source === 'string') return p.source;
   if (typeof p.text === 'string') return p.text.replace(/\{\{\d+\}\}/g, '____');
-  return '';
+  return 'Question';
 }
 
-function payloadOptions(payload: StudentQuestionPayload): string[] {
+function payloadOptions(payload: StudentQuestionPayload | null | undefined): string[] {
+  if (!payload || typeof payload !== 'object') return [];
   const p = payload as unknown as Record<string, unknown>;
   if (Array.isArray(p.options)) return p.options.map((option) => String(option));
   return [];
+}
+
+function safeBreakdown(result: QuestionResult): QuestionResult['breakdown'] {
+  return Array.isArray(result.breakdown) ? result.breakdown : [];
 }
 
 function splitFillBlanks(text: string): string[] {
@@ -63,7 +69,8 @@ export function PracticeAttemptPage() {
       const response = await getPracticeAttempt(attemptId);
       setAttempt(response.attempt);
       const nextAnswers: Record<string, unknown> = {};
-      response.attempt.answers.forEach((entry) => {
+      const savedAnswers = Array.isArray(response.attempt.answers) ? response.attempt.answers : [];
+      savedAnswers.forEach((entry) => {
         nextAnswers[String(entry.questionId)] = entry.value;
       });
       setAnswers(nextAnswers);
@@ -152,7 +159,11 @@ export function PracticeAttemptPage() {
     return () => window.clearTimeout(timer);
   }, [answers, attempt, loading, save]);
 
-  const questions = useMemo(() => attempt?.questions ?? [], [attempt]);
+  const questions = useMemo(
+    () => (Array.isArray(attempt?.questions) ? attempt.questions.filter((question): question is AttemptQuestion => Boolean(question && typeof question === 'object')) : []),
+    [attempt]
+  );
+  const savedAnswers = useMemo(() => (attempt && Array.isArray(attempt.answers) ? attempt.answers : []), [attempt]);
   const isExam = attempt?.mode === 'exam';
 
   // Countdown ticks once a second while an exam is running.
@@ -219,12 +230,12 @@ export function PracticeAttemptPage() {
   }
 
   const answeredQuestions = questions.filter((question) => {
-    const answer = attempt.answers.find((entry) => String(entry.questionId) === question.questionId);
+    const answer = savedAnswers.find((entry) => String(entry.questionId) === question.questionId);
     return answer ? !isEmptyValue(answer.value) : false;
   }).length;
 
   const unansweredQuestions = questions.filter((question) => {
-    const answer = attempt.answers.find((entry) => String(entry.questionId) === question.questionId);
+    const answer = savedAnswers.find((entry) => String(entry.questionId) === question.questionId);
     return !answer || isEmptyValue(answer.value);
   }).length;
 
@@ -239,7 +250,7 @@ export function PracticeAttemptPage() {
           <div>
             <h1 style={{ fontSize: 26, margin: 0 }}>{attempt.title}</h1>
             <p style={{ color: 'var(--text-secondary)', margin: '6px 0 0' }}>
-              {attempt.bookTitle} · {attempt.questionType.replace('_', ' ')} · Mode: {attempt.mode}
+              {attempt.bookTitle} · {String(attempt.questionType ?? '').replace('_', ' ') || 'questions'} · Mode: {attempt.mode}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -261,7 +272,7 @@ export function PracticeAttemptPage() {
                 key={question.questionId}
                 question={question}
                 index={index}
-                value={attempt.answers.find((entry) => String(entry.questionId) === question.questionId)?.value}
+                value={savedAnswers.find((entry) => String(entry.questionId) === question.questionId)?.value}
                 onChange={(value) => setAnswer(question.questionId, value)}
                 showFeedback={attempt.mode === 'practice'}
                 checkResult={checkResults[question.questionId]}
@@ -275,7 +286,7 @@ export function PracticeAttemptPage() {
             <h3 style={{ marginTop: 0 }}>Answer sheet</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
               {questions.map((question, index) => {
-                const answered = !!attempt.answers.find((entry) => String(entry.questionId) === question.questionId) && !isEmptyValue(attempt.answers.find((entry) => String(entry.questionId) === question.questionId)?.value);
+                const answered = !!savedAnswers.find((entry) => String(entry.questionId) === question.questionId) && !isEmptyValue(savedAnswers.find((entry) => String(entry.questionId) === question.questionId)?.value);
                 return (
                   <button
                     key={question.questionId}
@@ -584,7 +595,7 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
   return (
     <div className="pg-card" id={id} style={{ padding: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-        <strong>Question {index + 1} · {question.questionType.replace('_', ' ')}</strong>
+        <strong>Question {index + 1} · {String(question.questionType ?? '').replace('_', ' ') || 'question'}</strong>
         <Badge variant={question.marks > 0 ? 'info' : 'muted'}>{question.marks} mark(s)</Badge>
       </div>
       <div style={{ fontWeight: 700, marginBottom: 12 }}>{payloadText(question.payload)}</div>
@@ -606,6 +617,7 @@ function PracticeFeedback({ result }: { result: QuestionResult }) {
     return <p style={{ margin: 0, fontWeight: 700, color: 'var(--warning-text)' }}>Please answer this question first.</p>;
   }
   const correctText = Array.isArray(result.correctAnswer) ? result.correctAnswer.join(' · ') : String(result.correctAnswer ?? '');
+  const breakdown = safeBreakdown(result);
   return (
     <div role="status" style={{ padding: 12, borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--surface-subtle)' }}>
       {result.correct ? (
@@ -620,9 +632,9 @@ function PracticeFeedback({ result }: { result: QuestionResult }) {
       <p style={{ margin: '6px 0 0' }}>
         <strong>Correct answer:</strong> {correctText || '—'}
       </p>
-      {result.breakdown.length > 0 && (
+      {breakdown.length > 0 && (
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {result.breakdown.map((item, itemIndex) => (
+          {breakdown.map((item, itemIndex) => (
             <span key={itemIndex} style={{ fontSize: 13, color: item.correctFlag ? 'var(--success-text)' : 'var(--danger-text)' }}>
               {item.label}: {item.correctFlag ? '✔' : '✖'} {item.correctFlag ? item.student : `“${item.student}” → ${item.correct}`}
             </span>
@@ -641,7 +653,9 @@ interface AttemptResultsProps {
 }
 
 function AttemptResults({ attempt, answers, questions, onRetake }: AttemptResultsProps) {
-  const results = attempt.results ?? [];
+  const results = (Array.isArray(attempt.results) ? attempt.results : []).filter(
+    (result): result is QuestionResult => Boolean(result && typeof result === 'object')
+  );
   const obtained = attempt.obtainedMarks ?? 0;
   const total = attempt.totalMarks ?? 0;
   const percentage = attempt.percentage ?? 0;
@@ -668,6 +682,7 @@ function AttemptResults({ attempt, answers, questions, onRetake }: AttemptResult
             const studentAnswer = (answers[result.questionId] ?? null) as Record<string, unknown> | null;
             const answerText = formatStudentAnswer(result, studentAnswer, question);
             const correctAnswer = Array.isArray(result.correctAnswer) ? result.correctAnswer.join(' · ') : String(result.correctAnswer ?? '');
+            const breakdown = safeBreakdown(result);
             return (
               <div className="pg-card" key={result.questionId} style={{ padding: 18 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
@@ -681,9 +696,9 @@ function AttemptResults({ attempt, answers, questions, onRetake }: AttemptResult
                 <p style={{ margin: 0 }}>
                   <strong>Correct answer:</strong> {correctAnswer || '—'}
                 </p>
-                {result.breakdown.length > 0 && (
+                {breakdown.length > 0 && (
                   <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {result.breakdown.map((item, itemIndex) => (
+                    {breakdown.map((item, itemIndex) => (
                       <span key={itemIndex} style={{ fontSize: 13, color: item.correctFlag ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
                         {item.label}: You said “{item.student}”, correct answer: “{item.correct}”
                       </span>

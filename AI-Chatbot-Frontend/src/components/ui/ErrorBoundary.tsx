@@ -38,7 +38,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
           This page could not be shown. Please try again. If the problem continues, go back and start again.
         </p>
-        <Button onClick={this.reset}>Try again</Button>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Button onClick={this.reset}>Try again</Button>
+          <Button variant="secondary" onClick={() => { window.location.href = '/practice'; }}>Back to practice</Button>
+        </div>
       </div>
     );
   }
