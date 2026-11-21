@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Field, Input, Select } from '@/components/ui/Form';
 import { Modal } from '@/components/ui/Modal';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { SkeletonBox } from '@/components/ui/Skeleton';
 import {
   deleteAdminPracticeQuestion,
@@ -89,6 +90,7 @@ function questionAnswer(question: Record<string, unknown>): string {
 }
 
 export function PracticeAdminPage() {
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const [sets, setSets] = useState<AdminPracticeSetRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -207,7 +209,13 @@ export function PracticeAdminPage() {
   };
 
   const removeSet = async (set: AdminPracticeSetRow) => {
-    if (!window.confirm(`Delete question set "${set.title}"? This cannot be undone.`)) return;
+    const confirmed = await confirm({
+      title: 'Delete question set?',
+      message: `Delete question set "${set.title}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await deleteAdminPracticeSet(set._id);
       toast.success('Question set deleted.');
@@ -277,7 +285,13 @@ export function PracticeAdminPage() {
 
   const deleteQuestion = async (question: Record<string, unknown>) => {
     if (!managingSet) return;
-    if (!window.confirm('Delete this question?')) return;
+    const confirmed = await confirm({
+      title: 'Delete question?',
+      message: 'Delete this question? This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await deleteAdminPracticeQuestion(managingSet._id, String(question._id));
       toast.success('Question deleted.');

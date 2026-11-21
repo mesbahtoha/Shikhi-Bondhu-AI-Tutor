@@ -36,11 +36,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       <div role="alert" style={{ maxWidth: 520, margin: '64px auto', padding: 24, textAlign: 'center' }}>
         <h1 style={{ fontSize: 24, marginBottom: 8 }}>Something went wrong</h1>
         <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
-          This page could not be shown. Please try again. If the problem continues, go back and start again.
+          This page could not be loaded. This is often caused by a slow or interrupted internet connection.
+          Please reload the page and try again.
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Button onClick={this.reset}>Try again</Button>
-          <Button variant="secondary" onClick={() => { window.location.href = '/practice'; }}>Back to practice</Button>
+          <Button onClick={() => window.location.reload()}>Reload page</Button>
+          <Button variant="secondary" onClick={this.reset}>Try again</Button>
+          <Button variant="secondary" onClick={() => { window.location.href = '/'; }}>Go home</Button>
         </div>
       </div>
     );

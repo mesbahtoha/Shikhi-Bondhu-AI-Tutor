@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Form';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import {
   adminArchiveBook,
   adminCompleteBookUpload,
@@ -48,8 +49,10 @@ function stateBadge(book: AdminBook) {
 }
 
 export function AdminBooks() {
+  const confirm = useConfirm();
   const [books, setBooks] = useState<AdminBook[]>([]);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [detail, setDetail] = useState<{ book: AdminBook; jobs: IngestionJob[]; samples: { chunkId: string; chunkIndex: number; chapterTitle?: string; pageStart?: number; pageEnd?: number; preview: string }[] } | null>(null);
@@ -58,6 +61,14 @@ export function AdminBooks() {
   const [busy, setBusy] = useState('');
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [staleBackend, setStaleBackend] = useState(false);
+
+  const PAGE_SIZE = 20;
+  const pageCount = Math.max(1, Math.ceil(books.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const visibleBooks = useMemo(
+    () => books.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [books, safePage]
+  );
 
   const refresh = async () => {
     setLoading(true);
@@ -101,6 +112,18 @@ export function AdminBooks() {
     } finally {
       setBusy('');
     }
+  };
+
+  const removeBook = async (book: AdminBook) => {
+    const confirmed = await confirm({
+      title: 'বই মুছে ফেলবেন?',
+      message: `"${book.title}" এবং এর সব চাঙ্ক মুছে যাবে। এটি ফেরানো যাবে না।`,
+      confirmLabel: 'মুছো',
+      cancelLabel: 'বাতিল',
+      danger: true,
+    });
+    if (!confirmed) return;
+    await doAction(book._id, () => adminDeleteBook(book._id), 'মোছা');
   };
 
   const upload = async () => {
@@ -175,7 +198,7 @@ export function AdminBooks() {
               </tr>
             </thead>
             <tbody>
-              {books.map((b) => (
+              {visibleBooks.map((b) => (
                 <tr key={b._id} style={{ borderTop: '1px solid var(--border-color)' }}>
                   <td style={{ padding: 10 }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => void openDetail(b._id)} style={{ padding: 0 }}>
@@ -196,11 +219,7 @@ export function AdminBooks() {
                         size="sm"
                         variant="ghost"
                         disabled={!!busy}
-                        onClick={() => {
-                          if (window.confirm(`"${b.title}" মুছে ফেলবে? চাঙ্কসহ সব মুছে যাবে।`)) {
-                            void doAction(b._id, () => adminDeleteBook(b._id), 'মোছা');
-                          }
-                        }}
+                        onClick={() => void removeBook(b)}
                       >
                         মুছো
                       </Button>
@@ -210,6 +229,25 @@ export function AdminBooks() {
               ))}
             </tbody>
           </table>
+          {books.length > PAGE_SIZE && (
+            <div
+              className="flex items-center justify-between"
+              style={{ padding: '10px 12px', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap', gap: 8 }}
+            >
+              <span className="text-xs text-muted">
+                {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, books.length)} / {books.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="secondary" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>
+                  আগের
+                </Button>
+                <span className="text-xs text-muted">{safePage} / {pageCount}</span>
+                <Button size="sm" variant="secondary" disabled={safePage >= pageCount} onClick={() => setPage(safePage + 1)}>
+                  পরের
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -9,6 +9,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Pagination } from '@/components/ui/Pagination';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import { Input } from '@/components/ui/Form';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatDateTime } from '@/lib/format';
 
 interface AdminUserRow {
@@ -23,10 +25,12 @@ interface AdminUserRow {
 }
 
 export function AdminUsers() {
+  const confirm = useConfirm();
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [loading, setLoading] = useState(true);
   const limit = 20;
 
@@ -34,7 +38,7 @@ export function AdminUsers() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-      if (search) params.set('search', search);
+      if (debouncedSearch) params.set('search', debouncedSearch);
       const payload = await apiGet<{ items: AdminUserRow[]; total: number }>(
         `/api/v1/admin/users?${params.toString()}`
       );
@@ -45,7 +49,7 @@ export function AdminUsers() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, debouncedSearch]);
 
   useEffect(() => {
     void load();
@@ -62,7 +66,15 @@ export function AdminUsers() {
   };
 
   const promote = async (user: AdminUserRow) => {
-    if (!window.confirm(`Grant admin role to ${user.email}?`)) return;
+    const confirmed = await confirm({
+      title: user.role === 'admin' ? 'Remove admin role?' : 'Grant admin role?',
+      message:
+        user.role === 'admin'
+          ? `Remove administrator access from ${user.email}?`
+          : `Grant administrator access to ${user.email}?`,
+      confirmLabel: 'Continue',
+    });
+    if (!confirmed) return;
     try {
       await apiPatch(`/api/v1/admin/users/${user.id}`, { role: user.role === 'admin' ? 'user' : 'admin' });
       toast.success('Role updated');
@@ -73,7 +85,13 @@ export function AdminUsers() {
   };
 
   const remove = async (user: AdminUserRow) => {
-    if (!window.confirm(`Delete ${user.email} and all their chats?`)) return;
+    const confirmed = await confirm({
+      title: 'Delete user?',
+      message: `Delete ${user.email} and all their chats? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await apiDelete(`/api/v1/admin/users/${user.id}`);
       toast.success('User deleted');

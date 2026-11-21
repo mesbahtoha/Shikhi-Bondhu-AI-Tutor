@@ -21,7 +21,9 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Form';
 import { ChatSkeleton } from '@/components/ui/Skeleton';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { API_BASE_URL, apiPost, getErrorMessage } from '@/lib/api';
+import { copyText } from '@/lib/clipboard';
 import { makeTutorQuiz } from '@/lib/tutor';
 import type { QuizPreview, TutorSource } from '@/types';
 import { TUTOR_EXAMPLES } from './examples';
@@ -69,6 +71,7 @@ function TutorQuizAction({ topic }: { topic: string }) {
 export function TutorChatWorkspace() {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const current = useChatStore((s) => s.current);
   const isStreaming = useChatStore((s) => s.isStreaming);
@@ -229,11 +232,11 @@ export function TutorChatWorkspace() {
         { enabled: true }
       );
       const url = `${window.location.origin}/share/${payload.shareToken}`;
-      try {
-        await navigator.clipboard.writeText(url);
+      const copied = await copyText(url);
+      if (copied) {
         toast.success('Share link copied to clipboard');
-      } catch {
-        window.prompt('Share link:', url);
+      } else {
+        toast(url, { duration: 15000 });
       }
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -263,7 +266,13 @@ export function TutorChatWorkspace() {
 
   const handleDelete = async () => {
     if (!conversationId) return;
-    if (!window.confirm('Delete this conversation?')) return;
+    const confirmed = await confirm({
+      title: 'Delete chat?',
+      message: 'Delete this conversation? This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     await deleteConversation(conversationId);
     navigate('/tutor', { replace: true });
   };

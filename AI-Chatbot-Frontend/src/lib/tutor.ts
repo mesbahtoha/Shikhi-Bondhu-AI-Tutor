@@ -21,7 +21,7 @@ export async function guestChat(message: string, options?: { language?: string; 
     ...(options?.language ? { language: options.language } : {}),
     ...(options?.subject ? { subject: options.subject } : {}),
     ...(options?.bookId ? { bookId: options.bookId } : {}),
-  });
+  }, { timeout: 90000 });
   return payload.tutor;
 }
 
@@ -53,7 +53,7 @@ export async function tutorChat(message: string, options?: TutorChatOptions): Pr
       ...(options?.subject ? { subject: options.subject } : {}),
       ...(options?.bookId ? { bookId: options.bookId } : {}),
     },
-    { signal: options?.signal }
+    { signal: options?.signal, timeout: 120000 }
   );
   return payload.tutor;
 }
@@ -66,7 +66,7 @@ export async function makeTutorQuiz(topic: string, options?: { language?: string
       ...(options?.language ? { language: options.language } : {}),
       ...(options?.subject ? { subject: options.subject } : {}),
       ...(options?.bookId ? { bookId: options.bookId } : {}),
-    });
+    }, { timeout: 60000 });
   } catch {
     return null;
   }

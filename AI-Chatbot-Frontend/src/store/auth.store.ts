@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { AuthUser, QuotaStatus, UserUsage } from '@/types';
-import { apiGet, apiPost, tokenStore } from '@/lib/api';
+import { ApiRequestError, api, apiPost, tokenStore } from '@/lib/api';
 
 interface AuthState {
   user: AuthUser | null;
@@ -34,10 +34,14 @@ export function readPersistedUser(): AuthUser | null {
   }
 }
 
+const initialUser = readPersistedUser();
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: readPersistedUser(),
+  user: initialUser,
   usage: null,
-  status: tokenStore.access ? 'loading' : 'guest',
+  // Trust the persisted profile so mobile users are not blocked behind a slow
+  // /auth/me request. The token is validated in the background below.
+  status: tokenStore.access ? (initialUser ? 'authenticated' : 'loading') : 'guest',
   initialized: false,
 
   async initialize() {
@@ -45,15 +49,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ status: 'guest', initialized: true });
       return;
     }
+    const persisted = get().user;
     try {
-      const payload = await apiGet<{ user: AuthUser }>('/api/v1/auth/me');
+      // Single short attempt: the app already renders from the cached profile,
+      // so a dead mobile connection must not trigger a long retry chain.
+      const response = await api.get<{ user: AuthUser }>('/api/v1/auth/me', { timeout: 8000 });
+      const payload = response.data;
       persistUser(payload.user);
       set({ user: payload.user, status: 'authenticated', initialized: true });
       void get().refreshUsage();
-    } catch {
-      tokenStore.clear();
-      localStorage.removeItem('nf_user');
-      set({ user: null, status: 'guest', initialized: true });
+    } catch (error) {
+      const unauthorized = error instanceof ApiRequestError && error.status === 401;
+      if (unauthorized) {
+        tokenStore.clear();
+        localStorage.removeItem('nf_user');
+        set({ user: null, status: 'guest', initialized: true });
+        return;
+      }
+      // Offline or slow mobile network: keep the cached profile and let the
+      // app render. Individual API calls will surface their own errors.
+      if (persisted) {
+        set({ status: 'authenticated', initialized: true });
+        return;
+      }
+      set({ status: 'guest', initialized: true });
     }
   },
 
@@ -108,8 +127,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async refreshUsage() {
     try {
-      const payload = await apiGet<{ usage: UserUsage }>('/api/v1/users/me/usage');
-      set({ usage: payload.usage });
+      const payload = await api.get<{ usage: UserUsage }>('/api/v1/users/me/usage', { timeout: 10000 });
+      set({ usage: payload.data.usage });
     } catch {
       // non-fatal
     }

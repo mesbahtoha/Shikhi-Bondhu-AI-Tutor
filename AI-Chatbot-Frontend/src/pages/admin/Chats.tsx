@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Pagination } from '@/components/ui/Pagination';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import { Input } from '@/components/ui/Form';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatDateTime, truncate } from '@/lib/format';
 import type { MessageFeedback } from '@/types';
 
@@ -28,6 +29,7 @@ export function AdminChats() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [loading, setLoading] = useState(true);
   const limit = 20;
 
@@ -35,7 +37,7 @@ export function AdminChats() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-      if (search) params.set('search', search);
+      if (debouncedSearch) params.set('search', debouncedSearch);
       const payload = await apiGet<{ items: ChatRow[]; total: number }>(
         `/api/v1/admin/chats?${params.toString()}`
       );
@@ -46,7 +48,7 @@ export function AdminChats() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, debouncedSearch]);
 
   useEffect(() => {
     void load();

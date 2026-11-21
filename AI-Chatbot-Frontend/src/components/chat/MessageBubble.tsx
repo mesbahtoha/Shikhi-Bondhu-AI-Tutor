@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { FaRegThumbsUp, FaRegThumbsDown, FaUser } from 'react-icons/fa';
 import { MdAutoAwesome, MdThumbUp, MdThumbDown } from 'react-icons/md';
@@ -9,7 +9,7 @@ import { apiPost } from '@/lib/api';
 import { formatTokens } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 
-export function MessageBubble({ message }: { message: ChatMessage }) {
+export const MessageBubble = memo(function MessageBubble({ message }: { message: ChatMessage }) {
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
   const [comment, setComment] = useState('');
   const [showComment, setShowComment] = useState(false);
@@ -136,4 +136,4 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
       </div>
     </div>
   );
-}
+});

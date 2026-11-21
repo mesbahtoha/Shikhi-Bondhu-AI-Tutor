@@ -9,11 +9,13 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import { Field, Input, Textarea } from '@/components/ui/Form';
 import { Modal } from '@/components/ui/Modal';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Toggle } from '@/components/ui/Toggle';
 import { formatDate } from '@/lib/format';
 import type { PromptTemplate } from '@/types';
 
 export function AdminPromptTemplates() {
+  const confirm = useConfirm();
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -95,7 +97,13 @@ export function AdminPromptTemplates() {
   };
 
   const remove = async (template: PromptTemplate) => {
-    if (!window.confirm(`Delete template "${template.name}"?`)) return;
+    const confirmed = await confirm({
+      title: 'Delete template?',
+      message: `Delete template "${template.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await apiDelete(`/api/v1/admin/prompt-templates/${template._id}`);
       toast.success('Template deleted');

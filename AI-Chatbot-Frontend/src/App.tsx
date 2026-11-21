@@ -1,47 +1,50 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { ProtectedRoute, AdminRoute, PublicOnlyRoute } from '@/routes/guards';
 import { FullPageSpinner } from '@/components/ui/Spinner';
-import { LandingPage } from '@/pages/LandingPage';
 import { useAuthStore } from '@/store/auth.store';
 import { useChatStore } from '@/store/chat.store';
+import { lazyRoute } from '@/lib/lazyRoute';
 
 // Route-level code splitting: heavy pages (markdown/katex/highlight.js,
 // admin tables & charts) are loaded on demand so the initial bundle stays small.
-const LoginPage = lazy(() => import('@/pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })));
-const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage').then((m) => ({ default: m.RegisterPage })));
-const ForgotPasswordPage = lazy(() => import('@/pages/auth/PasswordPages').then((m) => ({ default: m.ForgotPasswordPage })));
-const ResetPasswordPage = lazy(() => import('@/pages/auth/PasswordPages').then((m) => ({ default: m.ResetPasswordPage })));
-const ShareView = lazy(() => import('@/pages/chat/ShareView').then((m) => ({ default: m.ShareView })));
-const WelcomePage = lazy(() => import('@/pages/WelcomePage').then((m) => ({ default: m.WelcomePage })));
-const TutorPage = lazy(() => import('@/pages/TutorPage').then((m) => ({ default: m.TutorPage })));
-const BooksPage = lazy(() => import('@/pages/BooksPage').then((m) => ({ default: m.BooksPage })));
-const BookDetailPage = lazy(() => import('@/pages/BookDetailPage').then((m) => ({ default: m.BookDetailPage })));
-const LearnPage = lazy(() => import('@/pages/LearnPage').then((m) => ({ default: m.LearnPage })));
-const PracticePage = lazy(() => import('@/pages/PracticePage').then((m) => ({ default: m.PracticePage })));
-const PracticeAttemptPage = lazy(() => import('@/pages/PracticeAttemptPage').then((m) => ({ default: m.PracticeAttemptPage })));
-const DocsPage = lazy(() => import('@/pages/DocsPage').then((m) => ({ default: m.DocsPage })));
-const DocsAdminPage = lazy(() => import('@/pages/admin/Docs').then((m) => ({ default: m.DocsAdminPage })));
-const AboutPage = lazy(() => import('@/pages/AboutPage').then((m) => ({ default: m.AboutPage })));
-const ContactPage = lazy(() => import('@/pages/ContactPage').then((m) => ({ default: m.ContactPage })));
-const HelpPage = lazy(() => import('@/pages/HelpPage').then((m) => ({ default: m.HelpPage })));
-const PrivacyPage = lazy(() => import('@/pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
-const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboard })));
-const AdminUsers = lazy(() => import('@/pages/admin/Users').then((m) => ({ default: m.AdminUsers })));
-const AdminNotices = lazy(() => import('@/pages/admin/Notices').then((m) => ({ default: m.AdminNotices })));
-const AdminChats = lazy(() => import('@/pages/admin/Chats').then((m) => ({ default: m.AdminChats })));
-const AdminAnalytics = lazy(() => import('@/pages/admin/Analytics').then((m) => ({ default: m.AdminAnalytics })));
-const AdminTokens = lazy(() => import('@/pages/admin/Tokens').then((m) => ({ default: m.AdminTokens })));
-const AdminBooks = lazy(() => import('@/pages/admin/Books').then((m) => ({ default: m.AdminBooks })));
-const AdminAISettings = lazy(() => import('@/pages/admin/AISettings').then((m) => ({ default: m.AdminAISettings })));
-const AdminSettings = lazy(() => import('@/pages/admin/Settings').then((m) => ({ default: m.AdminSettings })));
-const AdminPromptTemplates = lazy(() => import('@/pages/admin/PromptTemplates').then((m) => ({ default: m.AdminPromptTemplates })));
-const AdminLogs = lazy(() => import('@/pages/admin/Logs').then((m) => ({ default: m.AdminLogs })));
-const AdminSystem = lazy(() => import('@/pages/admin/System').then((m) => ({ default: m.AdminSystem })));
-const AdminPractice = lazy(() => import('@/pages/admin/Practice').then((m) => ({ default: m.PracticeAdminPage })));
+// `lazyRoute` adds retries so a dropped mobile connection does not leave a
+// route stuck on the loading spinner.
+const LandingPage = lazyRoute(() => import('@/pages/LandingPage').then((m) => ({ default: m.LandingPage })), 'landing');
+const LoginPage = lazyRoute(() => import('@/pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })), 'login');
+const RegisterPage = lazyRoute(() => import('@/pages/auth/RegisterPage').then((m) => ({ default: m.RegisterPage })), 'register');
+const ForgotPasswordPage = lazyRoute(() => import('@/pages/auth/PasswordPages').then((m) => ({ default: m.ForgotPasswordPage })), 'forgot-password');
+const ResetPasswordPage = lazyRoute(() => import('@/pages/auth/PasswordPages').then((m) => ({ default: m.ResetPasswordPage })), 'reset-password');
+const ShareView = lazyRoute(() => import('@/pages/chat/ShareView').then((m) => ({ default: m.ShareView })), 'share');
+const WelcomePage = lazyRoute(() => import('@/pages/WelcomePage').then((m) => ({ default: m.WelcomePage })), 'welcome');
+const TutorPage = lazyRoute(() => import('@/pages/TutorPage').then((m) => ({ default: m.TutorPage })), 'tutor');
+const BooksPage = lazyRoute(() => import('@/pages/BooksPage').then((m) => ({ default: m.BooksPage })), 'books');
+const BookDetailPage = lazyRoute(() => import('@/pages/BookDetailPage').then((m) => ({ default: m.BookDetailPage })), 'book-detail');
+const LearnPage = lazyRoute(() => import('@/pages/LearnPage').then((m) => ({ default: m.LearnPage })), 'learn');
+const PracticePage = lazyRoute(() => import('@/pages/PracticePage').then((m) => ({ default: m.PracticePage })), 'practice');
+const PracticeAttemptPage = lazyRoute(() => import('@/pages/PracticeAttemptPage').then((m) => ({ default: m.PracticeAttemptPage })), 'practice-attempt');
+const DocsPage = lazyRoute(() => import('@/pages/DocsPage').then((m) => ({ default: m.DocsPage })), 'docs');
+const DocsAdminPage = lazyRoute(() => import('@/pages/admin/Docs').then((m) => ({ default: m.DocsAdminPage })), 'admin-docs');
+const AboutPage = lazyRoute(() => import('@/pages/AboutPage').then((m) => ({ default: m.AboutPage })), 'about');
+const ContactPage = lazyRoute(() => import('@/pages/ContactPage').then((m) => ({ default: m.ContactPage })), 'contact');
+const HelpPage = lazyRoute(() => import('@/pages/HelpPage').then((m) => ({ default: m.HelpPage })), 'help');
+const PrivacyPage = lazyRoute(() => import('@/pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })), 'privacy');
+const AdminDashboard = lazyRoute(() => import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboard })), 'admin-dashboard');
+const AdminUsers = lazyRoute(() => import('@/pages/admin/Users').then((m) => ({ default: m.AdminUsers })), 'admin-users');
+const AdminNotices = lazyRoute(() => import('@/pages/admin/Notices').then((m) => ({ default: m.AdminNotices })), 'admin-notices');
+const AdminChats = lazyRoute(() => import('@/pages/admin/Chats').then((m) => ({ default: m.AdminChats })), 'admin-chats');
+const AdminAnalytics = lazyRoute(() => import('@/pages/admin/Analytics').then((m) => ({ default: m.AdminAnalytics })), 'admin-analytics');
+const AdminTokens = lazyRoute(() => import('@/pages/admin/Tokens').then((m) => ({ default: m.AdminTokens })), 'admin-tokens');
+const AdminBooks = lazyRoute(() => import('@/pages/admin/Books').then((m) => ({ default: m.AdminBooks })), 'admin-books');
+const AdminAISettings = lazyRoute(() => import('@/pages/admin/AISettings').then((m) => ({ default: m.AdminAISettings })), 'admin-ai-settings');
+const AdminSettings = lazyRoute(() => import('@/pages/admin/Settings').then((m) => ({ default: m.AdminSettings })), 'admin-settings');
+const AdminPromptTemplates = lazyRoute(() => import('@/pages/admin/PromptTemplates').then((m) => ({ default: m.AdminPromptTemplates })), 'admin-prompt-templates');
+const AdminLogs = lazyRoute(() => import('@/pages/admin/Logs').then((m) => ({ default: m.AdminLogs })), 'admin-logs');
+const AdminSystem = lazyRoute(() => import('@/pages/admin/System').then((m) => ({ default: m.AdminSystem })), 'admin-system');
+const AdminPractice = lazyRoute(() => import('@/pages/admin/Practice').then((m) => ({ default: m.PracticeAdminPage })), 'admin-practice');
 
 const PageLoader = () => <FullPageSpinner label="Loading…" />;
 

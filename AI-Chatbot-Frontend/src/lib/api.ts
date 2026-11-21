@@ -27,7 +27,10 @@ export const API_BASE_URL = (
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000,
+  // Shorter than the old 60s so a dead mobile connection fails (and retries)
+  // instead of leaving the UI spinning for a minute. AI/upload calls override
+  // this with their own longer timeouts.
+  timeout: 20000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -45,7 +48,7 @@ async function refreshAccessToken(): Promise<string> {
 
   const { data } = await axios.post(`${API_BASE_URL}/api/v1/auth/refresh`, {
     refreshToken,
-  });
+  }, { timeout: 10000 });
   const tokens = data?.tokens;
   if (!tokens?.accessToken) throw new Error('Refresh failed');
 
@@ -106,9 +109,33 @@ export class ApiRequestError extends Error {
   }
 }
 
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+/** Network failures and transient gateway errors are worth one quick retry. */
+function isRetryableRequestError(error: unknown): boolean {
+  if (error instanceof ApiRequestError) {
+    return error.status === 0 || error.status === 408 || error.status === 502 || error.status === 503 || error.status === 504;
+  }
+  return false;
+}
+
+/**
+ * Idempotent GETs retry once on flaky mobile connections. This avoids a single
+ * dropped packet showing an error page or leaving a route half-loaded.
+ */
 export async function apiGet<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-  const { data } = await api.get(url, config);
-  return data as T;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const { data } = await api.get(url, config);
+      return data as T;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 1 || !isRetryableRequestError(error)) throw error;
+      await sleep(400);
+    }
+  }
+  throw lastError;
 }
 
 export async function apiPost<T>(url: string, body?: unknown, config?: AxiosRequestConfig): Promise<T> {
@@ -142,8 +169,18 @@ export async function apiDelete<T>(url: string, config?: AxiosRequestConfig): Pr
 }
 
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof ApiRequestError) return error.message;
-  if (axios.isAxiosError(error)) return error.response?.data?.message || error.message;
+  if (error instanceof ApiRequestError) {
+    if (error.status === 0 || /network error|timeout|failed to fetch/i.test(error.message)) {
+      return 'Network problem. Please check your internet connection and try again.';
+    }
+    return error.message;
+  }
+  if (axios.isAxiosError(error)) {
+    if (!error.response || /network error|timeout|failed to fetch/i.test(error.message)) {
+      return 'Network problem. Please check your internet connection and try again.';
+    }
+    return error.response.data?.message || error.message;
+  }
   return error instanceof Error ? error.message : 'Something went wrong';
 }
 

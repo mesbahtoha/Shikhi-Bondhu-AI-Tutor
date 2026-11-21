@@ -74,11 +74,37 @@ export function useChatSession(conversationId: string) {
         void useAuthStore.getState().refreshUsage();
       };
 
+      // Batch streamed tokens so a long answer re-renders at a readable pace
+      // instead of once per token (which blocks the main thread on phones).
+      let pendingTokens = '';
+      let flushTimer: number | null = null;
+      let streamErrored = false;
+      const flushTokens = () => {
+        if (flushTimer !== null) {
+          window.clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        if (!pendingTokens) return;
+        const chunk = pendingTokens;
+        pendingTokens = '';
+        const state = useChatStore.getState();
+        const existing = state.current?.messages.find((m) => m._id === activeId)?.content ?? '';
+        state.updateLocalMessage(activeId, { content: existing + chunk });
+      };
+      const scheduleTokenFlush = () => {
+        if (flushTimer !== null) return;
+        flushTimer = window.setTimeout(() => {
+          flushTimer = null;
+          flushTokens();
+        }, 80);
+      };
+
       try {
         await streamPost(url, body, (event) => {
           const state = useChatStore.getState();
           switch (event.type) {
             case 'start': {
+              flushTokens();
               const serverId = String(event.messageId || '');
               const prevId = activeId;
               activeId = serverId || activeId;
@@ -93,9 +119,8 @@ export function useChatSession(conversationId: string) {
               break;
             }
             case 'token':
-              state.updateLocalMessage(activeId, {
-                content: (state.current?.messages.find((m) => m._id === activeId)?.content ?? '') + String(event.content ?? ''),
-              });
+              pendingTokens += String(event.content ?? '');
+              scheduleTokenFlush();
               break;
             case 'citations':
               state.updateLocalMessage(activeId, {
@@ -111,28 +136,34 @@ export function useChatSession(conversationId: string) {
               });
               break;
             case 'done':
+              flushTokens();
               state.updateLocalMessage(activeId, {
                 status: 'complete',
                 model: String(event.model || '') || undefined,
               });
               break;
             case 'error':
+              flushTokens();
+              streamErrored = true;
               state.updateLocalMessage(activeId, { status: 'error' });
               toast.error(String(event.message || 'Something went wrong during generation.'));
               break;
           }
         }, controller.signal);
 
+        flushTokens();
         finalize({
-          status: 'complete',
+          status: streamErrored ? 'error' : 'complete',
           model: useChatStore.getState().current?.messages.find((m) => m._id === activeId)?.model,
         });
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
+          flushTokens();
           finalize({ status: 'stopped' });
           toast('Generation stopped.', { icon: '⏹️' });
           return;
         }
+        flushTokens();
         finalize({
           status: 'error',
           content: `⚠️ ${getErrorMessage(error)}`,

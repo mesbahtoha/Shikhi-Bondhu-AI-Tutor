@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MdAdd, MdDelete } from 'react-icons/md';
 import { useChatStore } from '@/store/chat.store';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface TutorHistoryProps {
   activeId?: string;
@@ -15,6 +16,7 @@ interface TutorHistoryProps {
  * conversation list, now living inside Tutor so learners have one chat page.
  */
 export function TutorHistory({ activeId, creating = false, onSelect, onNew, onDeleted }: TutorHistoryProps) {
+  const confirm = useConfirm();
   const conversations = useChatStore((s) => s.conversations);
   const loadConversations = useChatStore((s) => s.loadConversations);
   const deleteConversation = useChatStore((s) => s.deleteConversation);
@@ -28,7 +30,13 @@ export function TutorHistory({ activeId, creating = false, onSelect, onNew, onDe
   }, [search, loadConversations]);
 
   const handleDelete = async (id: string, title: string) => {
-    if (!window.confirm(`Delete "${title || 'this chat'}"?`)) return;
+    const confirmed = await confirm({
+      title: 'Delete chat?',
+      message: `Delete "${title || 'this chat'}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     await deleteConversation(id);
     if (id === activeId) onDeleted?.(id);
   };

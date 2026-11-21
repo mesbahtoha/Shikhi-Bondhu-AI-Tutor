@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import { Field, Input, Select, Textarea } from '@/components/ui/Form';
 import { Modal } from '@/components/ui/Modal';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { formatDate } from '@/lib/format';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -35,6 +36,7 @@ function typeIcon(notice: NoticeRow) {
 }
 
 export function AdminNotices() {
+  const confirm = useConfirm();
   const [notices, setNotices] = useState<NoticeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('');
@@ -107,7 +109,13 @@ export function AdminNotices() {
   };
 
   const remove = async (notice: NoticeRow) => {
-    if (!window.confirm(`Delete "${notice.title}"?`)) return;
+    const confirmed = await confirm({
+      title: 'Delete notice?',
+      message: `Delete "${notice.title}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await apiDelete(`/api/v1/admin/notices/${notice._id}`);
       toast.success('Notice deleted');

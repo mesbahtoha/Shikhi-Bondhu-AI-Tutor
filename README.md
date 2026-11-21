@@ -906,6 +906,8 @@ snapshots and do not affect what is served. Only the latest successful productio
 | `Route not found: POST /api/v1/admin/books` | Stale backend deployment | Redeploy the backend from `main` |
 | 500 "Internal server error" on book upload | Old `books` text index used `language: 'bn'`, which MongoDB rejects | Redeploy the backend; `ensureIndexes` rebuilds the text index with `language_override: textSearchLanguage` |
 | `413 FUNCTION_PAYLOAD_TOO_LARGE` on book upload | PDF exceeds Vercel's 4.5 MB request body limit | Use the current admin UI, which slices large PDFs into 3 MB chunked uploads |
+| High INP / clicks freeze the page | Native `window.confirm`/`prompt` dialogs block the main thread while open | All destructive actions use the in-app confirm modal; long lists are paginated and streamed tokens are batched |
+| First load hangs on mobile data | Render-blocking third-party fonts, a stalled route chunk, or long API timeouts | Fonts load non-blocking, route chunks retry/reload once, API calls time out and retry, and cached profiles render before `/auth/me` finishes |
 | Admin panel shows "backend outdated" | Frontend points at an old backend URL | Update `VITE_API_BASE_URL` and redeploy both |
 | CORS error in browser | Origin not allowed | Add the exact frontend origin to `CORS_ORIGIN` |
 | `429` on guest chat | Guest per-minute limit | Wait a minute or log in |

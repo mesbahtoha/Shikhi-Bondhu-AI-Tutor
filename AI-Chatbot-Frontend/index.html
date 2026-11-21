@@ -8,11 +8,93 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Non-blocking: a slow Google Fonts request must never freeze first paint
+         (common on mobile data). System fonts render immediately. -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    >
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    </noscript>
     <title>Shikhi Bondhu, Class 3 English Friend</title>
+    <style>
+      .boot-shell {
+        min-height: 70vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 24px;
+        text-align: center;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        color: #1e293b;
+        background: #fdf8ef;
+      }
+      .boot-badge {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        background: #7c3aed;
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 28px;
+        border: 2px solid #1e293b;
+        box-shadow: 3px 3px 0 #1e293b;
+      }
+      .boot-shell h1 { margin: 6px 0 0; font-size: 22px; }
+      .boot-shell p { margin: 0; color: #475569; font-size: 14px; }
+      .boot-reload {
+        display: none;
+        margin-top: 10px;
+        min-height: 42px;
+        padding: 8px 22px;
+        border-radius: 999px;
+        border: 2px solid #1e293b;
+        background: #2563eb;
+        color: #fff;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .boot-dots::after {
+        content: '';
+        animation: bootDots 1.2s steps(4, end) infinite;
+      }
+      @keyframes bootDots {
+        0% { content: ''; }
+        25% { content: '.'; }
+        50% { content: '..'; }
+        75% { content: '...'; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-shell" id="boot-shell">
+        <div class="boot-badge" aria-hidden="true">🎓</div>
+        <h1>Shikhi Bondhu</h1>
+        <p>Loading your lessons<span class="boot-dots"></span></p>
+        <button class="boot-reload" id="boot-reload" type="button" onclick="location.reload()">
+          Reload
+        </button>
+      </div>
+    </div>
+    <noscript style="display:block;padding:24px;text-align:center;font-family:system-ui,sans-serif">
+      Please enable JavaScript to use Shikhi Bondhu.
+    </noscript>
+    <script>
+      // If the app is still loading after 8 seconds (slow mobile data), give
+      // the learner a clear manual retry instead of a blank/stuck screen.
+      window.setTimeout(function () {
+        var button = document.getElementById('boot-reload');
+        if (button) button.style.display = 'inline-flex';
+      }, 8000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
