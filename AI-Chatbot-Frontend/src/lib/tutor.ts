@@ -112,6 +112,44 @@ export async function adminUploadBook(form: FormData): Promise<{ book: AdminBook
   return apiUpload('/api/v1/admin/books', form);
 }
 
+export interface BookUploadSessionInfo {
+  uploadId: string;
+  chunkSize: number;
+  totalChunks: number;
+}
+
+/** Start a resumable upload for a PDF larger than the serverless body limit. */
+export async function adminCreateBookUploadSession(
+  input: Record<string, string | number>
+): Promise<BookUploadSessionInfo> {
+  return apiPost('/api/v1/admin/books/upload-sessions', input);
+}
+
+/** Upload one binary slice of a large textbook PDF. */
+export async function adminUploadBookChunk(
+  uploadId: string,
+  index: number,
+  chunk: Blob
+): Promise<{ receivedChunks: number; totalChunks: number }> {
+  const form = new FormData();
+  form.append('index', String(index));
+  form.append('chunk', chunk, `chunk-${index}.bin`);
+  return apiUpload(`/api/v1/admin/books/upload-sessions/${uploadId}/chunks`, form);
+}
+
+/** Assemble the uploaded slices and start book ingestion. */
+export async function adminCompleteBookUpload(
+  uploadId: string
+): Promise<{ book: AdminBook; jobId: string }> {
+  // Assembling a 60 MB PDF + writing it to GridFS can take longer than the
+  // default API timeout.
+  return apiPost(`/api/v1/admin/books/upload-sessions/${uploadId}/complete`, {}, { timeout: 180000 });
+}
+
+export async function adminAbortBookUpload(uploadId: string): Promise<void> {
+  await apiDelete(`/api/v1/admin/books/upload-sessions/${uploadId}`);
+}
+
 export async function adminUpdateBook(id: string, body: Record<string, unknown>): Promise<{ book: AdminBook }> {
   return apiPatch(`/api/v1/admin/books/${id}`, body);
 }

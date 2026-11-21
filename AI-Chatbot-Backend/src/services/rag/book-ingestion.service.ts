@@ -117,7 +117,9 @@ export const bookIngestionService = {
   async createBook(input: CreateBookInput) {
     const file = input.file;
     if (!file) throw Object.assign(new Error('A PDF file is required'), { statusCode: 400 });
-    if (file.mimetype !== 'application/pdf') throw Object.assign(new Error('Only PDF books are supported in this version'), { statusCode: 400 });
+    if (file.buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {
+      throw Object.assign(new Error('The uploaded file is not a valid PDF'), { statusCode: 400 });
+    }
     const maxBytes = env.tutor.uploadMaxMb * 1024 * 1024;
     if (file.size > maxBytes) throw Object.assign(new Error(`PDF exceeds the ${env.tutor.uploadMaxMb}MB limit`), { statusCode: 400 });
 

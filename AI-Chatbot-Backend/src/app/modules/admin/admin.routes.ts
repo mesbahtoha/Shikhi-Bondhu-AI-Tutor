@@ -15,11 +15,11 @@ import {
   updateTemplateSchema,
   updateUserSchema,
 } from './admin.validation';
-import adminBooksController, { createBookSchema, updateBookSchema } from './admin-books.controller';
+import adminBooksController, { createBookSchema, createBookUploadSessionSchema, updateBookSchema } from './admin-books.controller';
 import adminProvidersController, { updateProvidersSchema } from './admin-providers.controller';
 import adminPracticeRoutes from './admin-practice.routes';
 import adminDocsRoutes from '../docs/docs.admin.routes';
-import { uploadNoticeFile, uploadBookFile } from '../../../middleware/upload.middleware';
+import { uploadNoticeFile, uploadBookFile, uploadBookChunk } from '../../../middleware/upload.middleware';
 
 const router = Router();
 
@@ -72,6 +72,11 @@ router.get('/system', adminController.systemInfo);
 // Class 3 textbooks (admin-managed, data-driven catalogue)
 router.get('/books', adminBooksController.list);
 router.get('/books/:id', adminBooksController.get);
+// Chunked upload for PDFs larger than the serverless request-body limit.
+router.post('/books/upload-sessions', validate(createBookUploadSessionSchema), adminBooksController.createUploadSession);
+router.post('/books/upload-sessions/:uploadId/chunks', uploadBookChunk.single('chunk'), adminBooksController.uploadChunk);
+router.post('/books/upload-sessions/:uploadId/complete', adminBooksController.completeUpload);
+router.delete('/books/upload-sessions/:uploadId', adminBooksController.abortUpload);
 router.post('/books', uploadBookFile.single('file'), validate(createBookSchema), adminBooksController.create);
 router.patch('/books/:id', validate(updateBookSchema), adminBooksController.update);
 router.post('/books/:id/publish', adminBooksController.publish);

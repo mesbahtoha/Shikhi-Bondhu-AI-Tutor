@@ -12,6 +12,8 @@ export { ChunkModel, ChunkDocument } from './Chunk.model';
 export { ChatLogModel, ChatLogDocument, FeedbackModel } from './ChatLog.model';
 export { BookModel, BookDocument } from './Book.model';
 export { BookChunkModel, BookChunkDocument } from './BookChunk.model';
+export { BookUploadSessionModel, BookUploadSessionDocument } from './BookUploadSession.model';
+export { BookUploadChunkModel, BookUploadChunkDocument } from './BookUploadChunk.model';
 export { IngestionJobModel, IngestionJobDocument } from './IngestionJob.model';
 export {
   PracticeQuestionSetModel,

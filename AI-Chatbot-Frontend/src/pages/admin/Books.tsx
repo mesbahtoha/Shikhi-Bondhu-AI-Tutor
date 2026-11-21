@@ -6,6 +6,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import {
   adminArchiveBook,
+  adminCompleteBookUpload,
+  adminCreateBookUploadSession,
   adminDeleteBook,
   adminGetBook,
   adminListBooks,
@@ -13,10 +15,29 @@ import {
   adminReindexBook,
   adminUnpublishBook,
   adminUploadBook,
+  adminUploadBookChunk,
 } from '@/lib/tutor';
 import { getErrorMessage, isRouteNotFoundError } from '@/lib/api';
 import { StaleBackendNotice } from '@/components/ui/StaleBackendNotice';
 import type { AdminBook, IngestionJob } from '@/types';
+
+/** Vercel rejects request bodies over 4.5 MB, so larger PDFs are sent in slices. */
+const DIRECT_UPLOAD_LIMIT = 3.5 * 1024 * 1024;
+
+async function uploadChunkWithRetry(uploadId: string, index: number, chunk: Blob) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await adminUploadBookChunk(uploadId, index, chunk);
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) {
+        await new Promise((resolve) => window.setTimeout(resolve, 400 * attempt));
+      }
+    }
+  }
+  throw lastError;
+}
 
 function stateBadge(book: AdminBook) {
   if (book.publicationState === 'published') return <Badge variant="success">প্রকাশিত</Badge>;
@@ -35,6 +56,7 @@ export function AdminBooks() {
   const [form, setForm] = useState({ title: '', subject: 'গণিত', grade: 'Class 3', curriculum: 'NCTB', language: 'bn', edition: '', publisher: '', rightsStatus: 'unverified' });
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState('');
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [staleBackend, setStaleBackend] = useState(false);
 
   const refresh = async () => {
@@ -87,12 +109,30 @@ export function AdminBooks() {
       return;
     }
     setBusy('upload');
+    setUploadProgress(null);
     try {
-      const fd = new FormData();
-      for (const [k, v] of Object.entries(form)) fd.append(k, v);
-      fd.append('file', file);
-      const r = await adminUploadBook(fd);
-      toast.success(`আপলোড হয়েছে। প্রসেসিং চলছে (job ${r.jobId.slice(-6)})`);
+      let result: { jobId: string };
+      if (file.size <= DIRECT_UPLOAD_LIMIT) {
+        const fd = new FormData();
+        for (const [k, v] of Object.entries(form)) fd.append(k, v);
+        fd.append('file', file);
+        result = await adminUploadBook(fd);
+      } else {
+        const session = await adminCreateBookUploadSession({
+          ...form,
+          fileName: file.name,
+          fileSize: file.size,
+        });
+        for (let index = 0; index < session.totalChunks; index += 1) {
+          const start = index * session.chunkSize;
+          const end = Math.min(start + session.chunkSize, file.size);
+          const chunk = file.slice(start, end, 'application/pdf');
+          await uploadChunkWithRetry(session.uploadId, index, chunk);
+          setUploadProgress({ done: index + 1, total: session.totalChunks });
+        }
+        result = await adminCompleteBookUpload(session.uploadId);
+      }
+      toast.success(`আপলোড হয়েছে। প্রসেসিং চলছে (job ${result.jobId.slice(-6)})`);
       setUploadOpen(false);
       setFile(null);
       await refresh();
@@ -100,6 +140,7 @@ export function AdminBooks() {
       toast.error(getErrorMessage(e));
     } finally {
       setBusy('');
+      setUploadProgress(null);
     }
   };
 
@@ -187,8 +228,25 @@ export function AdminBooks() {
             <Input placeholder="সংস্করণ" value={form.edition} onChange={(e) => setForm({ ...form, edition: e.target.value })} />
             <Input placeholder="প্রকাশক" value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} />
           </div>
-          <input type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} aria-label="PDF ফাইল" />
-          <p className="text-xs text-muted">শুধু PDF (সর্বোচ্চ ৩০MB)। সার্ভারে ফাইল যাচাই হবে। প্রসেসিং ব্যাকগ্রাউন্ডে চলবে।</p>
+          <input type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} aria-label="PDF ফাইল" disabled={busy === 'upload'} />
+          {busy === 'upload' && uploadProgress && (
+            <div>
+              <div className="text-xs text-muted" style={{ marginBottom: 4 }}>
+                আপলোড হচ্ছে… {uploadProgress.done}/{uploadProgress.total} ({Math.round((uploadProgress.done / Math.max(1, uploadProgress.total)) * 100)}%)
+              </div>
+              <div style={{ height: 8, borderRadius: 999, background: 'var(--bg-surface-2)', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${Math.round((uploadProgress.done / Math.max(1, uploadProgress.total)) * 100)}%`,
+                    background: 'var(--color-primary)',
+                    transition: 'width 0.2s ease',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-muted">শুধু PDF (সর্বোচ্চ ৬০MB)। বড় বই স্বয়ংক্রিয়ভাবে টুকরো করে আপলোড হবে। সার্ভারে ফাইল যাচাই হবে।</p>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setUploadOpen(false)}>বাতিল</Button>
             <Button onClick={() => void upload()} disabled={busy === 'upload'}>{busy === 'upload' ? 'আপলোড হচ্ছে…' : 'আপলোড'}</Button>

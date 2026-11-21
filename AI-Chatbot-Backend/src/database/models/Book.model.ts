@@ -55,7 +55,16 @@ const bookSchema = new Schema(
 );
 
 bookSchema.index({ subject: 1, grade: 1, publicationState: 1 });
-bookSchema.index({ title: 'text', subject: 'text' });
+bookSchema.index(
+  { title: 'text', subject: 'text' },
+  {
+    name: 'book_text_search',
+    default_language: 'none',
+    // MongoDB text indexes do not support Bengali. Point the language override
+    // at a field we never write so `language: 'bn'` does not reject inserts.
+    language_override: 'textSearchLanguage',
+  }
+);
 
 export type BookDocument = InferSchemaType<typeof bookSchema> & {
   _id: mongoose.Types.ObjectId;

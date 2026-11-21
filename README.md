@@ -529,6 +529,10 @@ All admin routes require an admin JWT (`authenticate` + `requireAdmin`).
 | GET | `/api/v1/admin/books` | All books, including drafts |
 | GET | `/api/v1/admin/books/:id` | Book + ingestion jobs + chunk samples |
 | POST | `/api/v1/admin/books` | Upload PDF (`file`) + metadata |
+| POST | `/api/v1/admin/books/upload-sessions` | Start a chunked upload for a large PDF |
+| POST | `/api/v1/admin/books/upload-sessions/:uploadId/chunks` | Upload one 3 MB slice (`chunk`, `index`) |
+| POST | `/api/v1/admin/books/upload-sessions/:uploadId/complete` | Assemble slices and queue ingestion |
+| DELETE | `/api/v1/admin/books/upload-sessions/:uploadId` | Cancel an incomplete chunked upload |
 | PATCH | `/api/v1/admin/books/:id` | Update metadata |
 | POST | `/api/v1/admin/books/:id/publish` | Publish after ready |
 | POST | `/api/v1/admin/books/:id/unpublish` | Move back to draft |
@@ -635,8 +639,10 @@ GET /api/v1/health
 ## Book ingestion
 
 1. An admin uploads a PDF (max `BOOK_UPLOAD_MAX_MB`, default 60 MB) with title, subject,
-   grade, curriculum, language, edition, publisher, source notes, and rights status.
-2. The server checks the MIME type and size, verifies the `%PDF` signature, stores the file in
+   grade, curriculum, language, edition, publisher, source notes, and rights status. PDFs larger
+   than ~3.5 MB are sent as 3 MB slices and assembled server-side, because Vercel serverless
+   functions reject request bodies over 4.5 MB.
+2. The server checks the PDF signature and size, stores the file in
    GridFS (`uploads` bucket), creates a `Book` in `draft`, and queues an `IngestionJob`.
 3. A detached background job opens the PDF **page by page** (`pdfjs-dist` + `@napi-rs/canvas`).
    Pages with a selectable text layer use that text directly. Image-only pages are rendered at
@@ -898,6 +904,8 @@ snapshots and do not affect what is served. Only the latest successful productio
 | `MONGO_URI is missing in .env` | No connection string | Set `MONGO_URI`; use Atlas for Vercel |
 | 504 on first request after idle | Cold start / slow MongoDB | Use Atlas, keep boot jobs detached (already default), retry |
 | `Route not found: POST /api/v1/admin/books` | Stale backend deployment | Redeploy the backend from `main` |
+| 500 "Internal server error" on book upload | Old `books` text index used `language: 'bn'`, which MongoDB rejects | Redeploy the backend; `ensureIndexes` rebuilds the text index with `language_override: textSearchLanguage` |
+| `413 FUNCTION_PAYLOAD_TOO_LARGE` on book upload | PDF exceeds Vercel's 4.5 MB request body limit | Use the current admin UI, which slices large PDFs into 3 MB chunked uploads |
 | Admin panel shows "backend outdated" | Frontend points at an old backend URL | Update `VITE_API_BASE_URL` and redeploy both |
 | CORS error in browser | Origin not allowed | Add the exact frontend origin to `CORS_ORIGIN` |
 | `429` on guest chat | Guest per-minute limit | Wait a minute or log in |

@@ -36,7 +36,15 @@ const bookChunkSchema = new Schema(
 bookChunkSchema.index({ bookId: 1, chunkIndex: 1 });
 bookChunkSchema.index({ bookId: 1, searchTerms: 1 });
 bookChunkSchema.index({ bookId: 1, pageType: 1 });
-bookChunkSchema.index({ bookTitle: 'text', text: 'text', normalizedText: 'text', chapterTitle: 'text' });
+bookChunkSchema.index(
+  { bookTitle: 'text', text: 'text', normalizedText: 'text', chapterTitle: 'text' },
+  {
+    name: 'book_chunk_text_search',
+    default_language: 'none',
+    // See Book.model.ts: Bengali is not a valid MongoDB text language.
+    language_override: 'textSearchLanguage',
+  }
+);
 
 export type BookChunkDocument = InferSchemaType<typeof bookChunkSchema> & {
   _id: mongoose.Types.ObjectId;

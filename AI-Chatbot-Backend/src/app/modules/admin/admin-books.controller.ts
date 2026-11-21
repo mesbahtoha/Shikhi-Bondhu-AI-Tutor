@@ -5,6 +5,7 @@ import { BookModel } from '../../../database/models/Book.model';
 import { BookChunkModel } from '../../../database/models/BookChunk.model';
 import { IngestionJobModel } from '../../../database/models/IngestionJob.model';
 import bookIngestionService from '../../../services/rag/book-ingestion.service';
+import bookUploadService from '../../../services/rag/book-upload.service';
 import { normalizeText } from '../../../utils/text.utils';
 
 export const createBookSchema = z.object({
@@ -18,6 +19,12 @@ export const createBookSchema = z.object({
   publisher: z.string().max(200).optional(),
   sourceNotes: z.string().max(2000).optional(),
   rightsStatus: z.string().max(50).optional(),
+});
+
+/** Metadata for a chunked (large PDF) upload session. */
+export const createBookUploadSessionSchema = createBookSchema.extend({
+  fileName: z.string().min(1).max(300),
+  fileSize: z.coerce.number().int().positive(),
 });
 
 export const updateBookSchema = z.object({
@@ -119,6 +126,48 @@ export const adminBooksController = {
       file: req.file,
     });
     res.status(201).json({ success: true, message: 'Book uploaded. Processing in background.', book: bookPayload(book.toObject()), jobId, requestId: req.requestId });
+  }),
+
+  /** Start a chunked upload for a PDF that exceeds the serverless body limit. */
+  createUploadSession: asyncHandler(async (req: Request, res: Response) => {
+    const { fileName, fileSize, ...metadata } = req.body as Record<string, unknown>;
+    const session = await bookUploadService.createSession(
+      req.user!.id,
+      metadata as never,
+      String(fileName),
+      Number(fileSize)
+    );
+    res.status(201).json({ success: true, ...session, requestId: req.requestId });
+  }),
+
+  /** Store one slice of a chunked upload. */
+  uploadChunk: asyncHandler(async (req: Request, res: Response) => {
+    if (!req.file) return fail(res, 400, 'A PDF chunk is required (field name "chunk")');
+    const index = Number(req.body.index);
+    const result = await bookUploadService.saveChunk(
+      req.user!.id,
+      req.params.uploadId,
+      index,
+      req.file.buffer
+    );
+    ok(res, result);
+  }),
+
+  /** Assemble all chunks, then hand the complete PDF to the ingestion pipeline. */
+  completeUpload: asyncHandler(async (req: Request, res: Response) => {
+    const { book, jobId } = await bookUploadService.complete(req.user!.id, req.params.uploadId);
+    res.status(201).json({
+      success: true,
+      message: 'Book uploaded. Processing in background.',
+      book: bookPayload(book.toObject()),
+      jobId,
+      requestId: req.requestId,
+    });
+  }),
+
+  abortUpload: asyncHandler(async (req: Request, res: Response) => {
+    await bookUploadService.abort(req.user!.id, req.params.uploadId);
+    ok(res, { message: 'Upload cancelled' });
   }),
 
   update: asyncHandler(async (req: Request, res: Response) => {

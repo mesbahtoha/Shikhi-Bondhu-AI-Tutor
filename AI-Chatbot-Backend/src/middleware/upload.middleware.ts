@@ -68,9 +68,24 @@ export const uploadBookFile = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: env.tutor.uploadMaxMb * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'application/pdf') cb(null, true);
-    else cb(new Error('Only PDF books are supported in this version'));
+    // Some browsers send PDFs as application/octet-stream; the ingestion
+    // service still verifies the %PDF- signature before storing anything.
+    if (file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf')) {
+      cb(null, true);
+    } else {
+      cb(Object.assign(new Error('Only PDF books are supported in this version'), { statusCode: 400 }) as never);
+    }
   },
+});
+
+/**
+ * Multipart upload for one 3 MB slice of a large textbook PDF. Kept below
+ * Vercel's 4.5 MB request body limit; the PDF signature is checked on the
+ * first chunk by the upload service.
+ */
+export const uploadBookChunk = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024, files: 1 },
 });
 
 /** Multipart upload for avatars. */
