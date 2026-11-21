@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -43,6 +43,18 @@ function formatClock(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function BackToPractice({ style }: { style?: CSSProperties }) {
+  return (
+    <Link
+      to="/practice"
+      className="pg-btn-secondary"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', ...style }}
+    >
+      <span aria-hidden="true">←</span> Back to practice
+    </Link>
+  );
 }
 
 export function PracticeAttemptPage() {
@@ -190,6 +202,7 @@ export function PracticeAttemptPage() {
     return (
       <div className="pg-app" style={{ paddingBottom: 72 }}>
         <div className="pg-container" style={{ maxWidth: 860, paddingTop: 28 }}>
+          <BackToPractice style={{ marginBottom: 16 }} />
           <SkeletonBox width="40%" height={22} />
           <SkeletonBox width="60%" height={34} style={{ margin: '10px 0 20px' }} />
           <SkeletonBox width="100%" height={120} />
@@ -202,7 +215,8 @@ export function PracticeAttemptPage() {
   if (loadError || !attempt) {
     return (
       <div className="pg-app" style={{ paddingBottom: 72 }}>
-        <div className="pg-container" style={{ maxWidth: 640, paddingTop: 48 }}>
+        <div className="pg-container" style={{ maxWidth: 640, paddingTop: 28 }}>
+          <BackToPractice style={{ marginBottom: 16 }} />
           <EmptyState icon="🧭" title="Practice session not found" description={loadError ?? 'Please start a new practice session.'} />
           <div style={{ textAlign: 'center', marginTop: 16 }}>
             <Link to="/practice"><Button variant="secondary">Back to practice</Button></Link>
@@ -238,6 +252,7 @@ export function PracticeAttemptPage() {
   return (
     <div className="pg-app" style={{ paddingBottom: 72 }}>
       <div className="pg-container" style={{ maxWidth: 980, paddingTop: 20 }}>
+        <BackToPractice style={{ marginBottom: 12 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <h1 style={{ fontSize: 26, margin: 0 }}>{attempt.title}</h1>
@@ -655,6 +670,7 @@ function AttemptResults({ attempt, answers, questions, onRetake }: AttemptResult
   return (
     <div className="pg-app" style={{ paddingBottom: 72 }}>
       <div className="pg-container" style={{ maxWidth: 860, paddingTop: 28 }}>
+        <BackToPractice style={{ marginBottom: 16 }} />
         <div className="pg-card pg-card-mint-shadow" style={{ padding: 24, textAlign: 'center' }}>
           <h1 style={{ margin: 0, fontSize: 30 }}>{attempt.mode === 'exam' ? 'Exam result' : 'Practice result'}</h1>
           <div style={{ fontSize: 56, fontWeight: 900, margin: '12px 0' }}>{percentage}%</div>

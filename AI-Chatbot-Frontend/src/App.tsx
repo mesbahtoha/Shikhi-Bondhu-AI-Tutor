@@ -102,8 +102,8 @@ export default function App() {
           <Route element={<AppShell />}>
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/chat/:id" element={<ChatPage />} />
-            <Route path="/practice/attempt/:attemptId" element={<PracticeAttemptPage />} />
           </Route>
+          <Route path="/practice/attempt/:attemptId" element={<PracticeAttemptPage />} />
         </Route>
 
         <Route element={<AdminRoute />}>
