@@ -19,7 +19,7 @@ import type { ChapterRef } from './types';
  * chapter's own ingested text; answers stay deterministic.
  */
 
-export const AUTO_SEED_KEY_PREFIX = 'sb-practice-v1';
+export const AUTO_SEED_KEY_PREFIX = 'sb-practice-v2';
 export const AUTO_SEED_CREATED_BY = 'Shikhi Bondhu auto-seed';
 const AUTO_SEED_MARKER_KEY = 'practice.autoSeedVersion';
 

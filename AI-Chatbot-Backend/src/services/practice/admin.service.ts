@@ -4,9 +4,9 @@ import { BookModel } from '../../database/models/Book.model';
 import { PracticeQuestionModel } from '../../database/models/PracticeQuestion.model';
 import { PracticeQuestionSetModel } from '../../database/models/PracticeQuestionSet.model';
 import {
+  PRACTICE_ACTIVE_QUESTION_TYPES,
   PRACTICE_DIFFICULTIES,
   PRACTICE_PUBLICATION_STATES,
-  PRACTICE_QUESTION_TYPES,
 } from '../../constants';
 import { listChaptersForBook } from './chapters.service';
 import { startPracticeAttempt } from './practice.service';
@@ -89,7 +89,7 @@ export const createQuestionSetSchema = z.object({
   title: z.string().min(1).max(200),
   bookId: z.string().min(1),
   chapters: z.array(z.string().min(1)).min(1).max(50),
-  questionType: z.enum(PRACTICE_QUESTION_TYPES),
+  questionType: z.enum(PRACTICE_ACTIVE_QUESTION_TYPES),
   difficulty: z.enum(PRACTICE_DIFFICULTIES).optional(),
   instructions: z.string().max(2000).optional(),
   marksPerQuestion: z.number().min(0).max(100).optional(),

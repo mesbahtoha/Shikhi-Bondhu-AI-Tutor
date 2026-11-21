@@ -44,11 +44,9 @@ const EMPTY_FORM: SetFormState = {
 
 const QUESTION_TYPES = [
   { value: 'mcq', label: 'Multiple Choice (MCQ)' },
-  { value: 'fill_blank', label: 'Fill in the Blanks' },
   { value: 'true_false', label: 'True / False' },
   { value: 'matching', label: 'Matching' },
   { value: 'one_word', label: 'One Word Answer' },
-  { value: 'rearrange', label: 'Rearrange' },
   { value: 'translation', label: 'Translation' },
 ];
 

@@ -104,11 +104,9 @@ const TYPE_LABELS: Record<PracticeQuestionType, string> = {
 
 export const AUTO_SEED_QUESTION_TYPES: PracticeQuestionType[] = [
   'mcq',
-  'fill_blank',
   'true_false',
   'matching',
   'one_word',
-  'rearrange',
   'translation',
 ];
 

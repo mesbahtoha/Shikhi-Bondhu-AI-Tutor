@@ -47,11 +47,9 @@ interface BuilderState {
 
 const QUESTION_LABELS: Record<string, string> = {
   mcq: 'Multiple Choice (MCQ)',
-  fill_blank: 'Fill in the Blanks',
   true_false: 'True / False',
   matching: 'Matching',
   one_word: 'One Word Answer',
-  rearrange: 'Rearrange',
   translation: 'Translation',
 };
 

@@ -33,11 +33,9 @@ const PAGE_SIZE = 20;
 
 const TYPE_LABELS: Record<string, string> = {
   mcq: 'MCQ',
-  fill_blank: 'Fill blanks',
   true_false: 'True / False',
   matching: 'Matching',
   one_word: 'One word',
-  rearrange: 'Rearrange',
   translation: 'Translation',
 };
 

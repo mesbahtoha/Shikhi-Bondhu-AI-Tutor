@@ -110,6 +110,20 @@ export const PRACTICE_QUESTION_TYPES = [
 ] as const;
 export type PracticeQuestionType = (typeof PRACTICE_QUESTION_TYPES)[number];
 
+/**
+ * Question types exposed in the student and admin interfaces. Fill-in-the-blank
+ * and rearrange are kept in the legacy type union so old attempts still render,
+ * but they are no longer offered or creatable.
+ */
+export const PRACTICE_ACTIVE_QUESTION_TYPES = [
+  'mcq',
+  'true_false',
+  'matching',
+  'one_word',
+  'translation',
+] as const;
+export type PracticeActiveQuestionType = (typeof PRACTICE_ACTIVE_QUESTION_TYPES)[number];
+
 export const PRACTICE_DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
 export type PracticeDifficulty = (typeof PRACTICE_DIFFICULTIES)[number];
 

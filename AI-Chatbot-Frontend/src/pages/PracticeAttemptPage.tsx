@@ -12,9 +12,11 @@ import type { AttemptQuestion, PracticeAttempt, QuestionResult, StudentQuestionP
 function payloadText(payload: StudentQuestionPayload | null | undefined): string {
   if (!payload || typeof payload !== 'object') return 'Question';
   const p = payload as unknown as Record<string, unknown>;
+  // Translation questions carry both a `source` sentence and a short
+  // instruction. The learner must always see the sentence they are translating.
+  if (typeof p.source === 'string') return p.source;
   if (typeof p.question === 'string') return p.question;
   if (typeof p.statement === 'string') return p.statement;
-  if (typeof p.source === 'string') return p.source;
   if (typeof p.text === 'string') return p.text.replace(/\{\{\d+\}\}/g, '____');
   if (Array.isArray(p.left) && Array.isArray(p.right)) return 'Match Column A with Column B.';
   if (Array.isArray(p.items)) return 'Put the words in the correct order.';
@@ -644,8 +646,12 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
 
     case 'translation': {
       const text = typeof current.text === 'string' ? current.text : '';
+      const instruction = typeof (question.payload as { question?: unknown }).question === 'string'
+        ? String((question.payload as { question: string }).question)
+        : 'Translate this sentence.';
       content = (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13, fontWeight: 700 }}>{instruction}</p>
           <textarea
             className="textarea"
             rows={3}

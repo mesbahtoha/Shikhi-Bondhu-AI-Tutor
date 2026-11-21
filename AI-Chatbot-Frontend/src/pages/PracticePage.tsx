@@ -9,11 +9,9 @@ import type { PracticeBookSummary, PracticeChapterSummary, PracticeQuestionType,
 
 const QUESTION_TYPES: Array<{ value: PracticeQuestionType; label: string; description: string }> = [
   { value: 'mcq', label: 'Multiple Choice', description: 'Pick the correct answer from the options.' },
-  { value: 'fill_blank', label: 'Fill in the Blanks', description: 'Fill in the missing words in the sentence.' },
   { value: 'true_false', label: 'True / False', description: 'Say whether the statement is true or false.' },
   { value: 'matching', label: 'Matching', description: 'Match the left items with the right items.' },
   { value: 'one_word', label: 'One Word Answer', description: 'Answer using a single word.' },
-  { value: 'rearrange', label: 'Rearrange', description: 'Put the words in the correct order.' },
   { value: 'translation', label: 'Translation', description: 'Translate the sentence into the target language.' },
 ];
 
@@ -220,7 +218,7 @@ export function PracticePage() {
             <>
               <h2 style={{ marginTop: 0 }}>Step 3: Choose question type</h2>
               <p style={{ margin: '0 0 12px', color: 'var(--text-secondary)', fontSize: 13.5 }}>
-                All seven types are ready for every chapter. Questions are taken from the book and can be edited later in the admin panel.
+                Every type is ready for every chapter. Questions are taken from the book and can be edited later in the admin panel.
               </p>
               <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
                 {QUESTION_TYPES.map((type) => (

@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { PRACTICE_ACTIVE_QUESTION_TYPES } from '../../../constants';
 
 export const startAttemptSchema = z.object({
   bookId: z.string().min(1).max(64),
-  questionType: z.enum(['mcq', 'fill_blank', 'true_false', 'matching', 'one_word', 'rearrange', 'translation']),
+  questionType: z.enum(PRACTICE_ACTIVE_QUESTION_TYPES),
   mode: z.enum(['practice', 'exam']),
   chapters: z.array(z.string().min(1).max(64)).max(50).optional(),
 });
