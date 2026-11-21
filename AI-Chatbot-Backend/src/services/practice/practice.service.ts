@@ -266,7 +266,15 @@ export async function startPracticeAttempt(
     ? chapterIds.map((id) => allChapters.get(id) ?? { id, title: '', order: 0 })
     : Array.from(allChapters.values());
 
-  const durationMinutes = mode === 'exam' && primary.examDurationMinutes ? Number(primary.examDurationMinutes) : null;
+  const baseDuration = mode === 'exam' && primary.examDurationMinutes ? Number(primary.examDurationMinutes) : null;
+  // When several chapter sets are combined (for example "All chapters"),
+  // give the learner the same per-chapter time instead of one tiny timer.
+  const durationMinutes =
+    baseDuration === null
+      ? null
+      : sets.length > 1
+        ? Math.min(600, Math.max(1, baseDuration * sets.length))
+        : baseDuration;
 
   const attempt = await PracticeAttemptModel.create({
     userId: options.userId,

@@ -3,6 +3,7 @@ import env from './env';
 import { log } from './logger';
 import { ensureIndexes } from '../database/indexes';
 import { seedDatabase } from '../database/seeders';
+import { schedulePracticeAutoSeed } from '../services/practice/auto-seed.service';
 
 let isConnected = false;
 let bootJobsStarted = false;
@@ -63,6 +64,9 @@ export function runBootJobs(): void {
   const job = (async () => {
     await ensureIndexes();
     await seedDatabase();
+    // Practice sets are content-heavy; keep them detached from the boot
+    // critical path so cold starts stay fast even on the first deployment.
+    schedulePracticeAutoSeed();
     log.info('Boot jobs completed (indexes + seed)');
   })();
 

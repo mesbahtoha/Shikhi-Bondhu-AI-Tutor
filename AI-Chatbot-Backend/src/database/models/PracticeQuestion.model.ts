@@ -31,6 +31,8 @@ const practiceQuestionSchema = new Schema(
     payload: { type: Schema.Types.Mixed, required: true },
     answer: { type: Schema.Types.Mixed, required: true },
     alternatives: { type: [String], default: [] },
+    /** Deterministic id for the boot-time, book-grounded question seeder. */
+    autoSeedKey: { type: String, default: undefined },
   },
   { timestamps: true, collection: 'practice_questions' }
 );

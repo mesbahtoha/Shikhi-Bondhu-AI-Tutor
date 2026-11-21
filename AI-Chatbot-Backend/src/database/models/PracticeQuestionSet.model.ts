@@ -55,6 +55,8 @@ const practiceQuestionSetSchema = new Schema(
     },
     createdBy: { type: String, default: '' },
     publishedAt: { type: Date, default: null },
+    /** Deterministic id for the boot-time, book-grounded question seeder. */
+    autoSeedKey: { type: String, default: undefined },
   },
   { timestamps: true, collection: 'practice_question_sets' }
 );

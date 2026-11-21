@@ -1,9 +1,10 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { FaRobot, FaFacebook, FaYoutube, FaEnvelope, FaPhone, FaMapMarkerAlt } from 'react-icons/fa';
+import { FaFacebook, FaYoutube, FaEnvelope, FaPhone, FaMapMarkerAlt } from 'react-icons/fa';
 import { MdMenu, MdClose, MdExpandMore, MdDashboard, MdLogout, MdPerson } from 'react-icons/md';
 import { useAuthStore } from '@/store/auth.store';
 import { useEffect, useRef, useState } from 'react';
 import { ThemeLangControls } from '@/components/ui/ThemeLangControls';
+import { BrandLogo, BrandMark } from '@/components/brand/BrandLogo';
 import { useLang } from '@/lib/i18n';
 
 export function PublicLayout() {
@@ -47,8 +48,7 @@ export function PublicLayout() {
     <div className="pg-app flex flex-col" style={{ minHeight: '100vh' }}>
       <header className="public-header sticky-header flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 brand-link" onClick={close}>
-          <span className="brand-badge"><FaRobot size={18} /></span>
-          <span className="brand-name">Shikhi Bondhu</span>
+          <BrandLogo size={38} tagline="Class 3 study buddy" />
         </Link>
 
         <nav className="public-nav-desktop" aria-label="Primary">
@@ -134,8 +134,11 @@ export function PublicLayout() {
           <div className="pg-container footer-grid">
             <div>
               <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
-                <span className="brand-badge" style={{ width: 34, height: 34 }}><FaRobot size={15} /></span>
-                <strong style={{ fontFamily: 'Outfit, sans-serif' }}>Shikhi Bondhu</strong>
+                <BrandMark size={40} />
+                <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+                  <strong style={{ fontFamily: 'Outfit, sans-serif' }}>Shikhi Bondhu</strong>
+                  <span className="brand-tagline">Class 3 study buddy</span>
+                </span>
               </div>
               <p>{t('footer.tag')}</p>
               <p className="footer-small">{t('footer.made')}</p>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { MdDownload, MdMenuBook } from 'react-icons/md';
 import { getBook, listBooks } from '@/lib/tutor';
+import { API_BASE_URL } from '@/lib/api';
 import { useTutorStore } from '@/store/tutor.store';
 import { useLang } from '@/lib/i18n';
 import type { BookInfo } from '@/types';
@@ -20,14 +22,13 @@ export function BookDetailPage() {
   const { lang } = useLang();
   const bn = lang === 'bn';
   const [book, setBook] = useState<BookInfo | null>(null);
-  const [samples, setSamples] = useState<{ chunkId: string; chapterTitle?: string; pageStart?: number; pageEnd?: number; preview: string }[]>([]);
   const [related, setRelated] = useState<BookInfo[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!bookId) return;
     getBook(bookId)
-      .then((r) => { setBook(r.book); setSamples(r.samples ?? []); })
+      .then((r) => { setBook(r.book); })
       .catch(() => setError(bn ? 'বইটি পাওয়া যায়নি।' : 'Book not found.'));
     listBooks().then((all) => setRelated(all.filter((b) => b._id !== bookId).slice(0, 3))).catch(() => setRelated([]));
   }, [bookId, bn]);
@@ -43,6 +44,11 @@ export function BookDetailPage() {
     );
   }
   if (!book) return <div className="pg-app" style={{ padding: 24 }}><div className="pg-container"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-text" /><div className="skeleton skeleton-text short" /></div></div>;
+
+  const downloadUrl = book.downloadUrl
+    ? `${API_BASE_URL}${book.downloadUrl}`
+    : `${API_BASE_URL}/api/v1/books/${book._id}/download`;
+  const canDownload = book.hasDownload !== false;
 
   return (
     <div className="pg-app" style={{ paddingBottom: 72 }}>
@@ -77,15 +83,25 @@ export function BookDetailPage() {
           </button>
         </div>
 
-        <div className="pg-card" style={{ padding: 20, marginTop: 16 }}>
-          <h2 style={{ fontSize: 19 }}>{bn ? 'বইয়ের ভেতরে (নমুনা)' : 'Inside this book (samples)'}</h2>
-          {samples.length === 0 && <p className="muted">{bn ? 'এখনো নমুনা নেই।' : 'No samples yet.'}</p>}
-          {samples.map((s) => (
-            <div key={s.chunkId} className="sample-row">
-              <div className="sample-head">{s.chapterTitle || (bn ? 'অংশ' : 'Part')}{s.pageStart ? `, Page ${s.pageStart}` : ''}</div>
-              <p>{s.preview}</p>
-            </div>
-          ))}
+        <div className="pg-card download-card" style={{ padding: 22, marginTop: 16 }}>
+          <div className="download-icon" aria-hidden="true"><MdMenuBook size={26} /></div>
+          <div className="download-copy">
+            <h2 style={{ fontSize: 19, margin: 0 }}>{bn ? 'বইটি ডাউনলোড করো' : 'Download this book'}</h2>
+            <p className="muted" style={{ margin: '4px 0 0', fontSize: 13.5 }}>
+              {bn
+                ? `পুরো বইয়ের PDF${book.pageCount ? ` · ${book.pageCount} পৃষ্ঠা` : ''}। অফলাইনে পড়া বা প্রিন্ট করার জন্য সংরক্ষণ করো।`
+                : `The complete book PDF${book.pageCount ? ` · ${book.pageCount} pages` : ''}. Save it for offline reading or printing.`}
+            </p>
+          </div>
+          {canDownload ? (
+            <a className="pg-btn-candy download-btn" href={downloadUrl} download={`${book.title}.pdf`} rel="noreferrer">
+              <MdDownload size={19} /> {bn ? 'PDF ডাউনলোড' : 'Download PDF'}
+            </a>
+          ) : (
+            <span className="pg-badge pg-badge-yellow" style={{ alignSelf: 'center' }}>
+              {bn ? 'PDF এখনো যুক্ত হয়নি' : 'PDF not added yet'}
+            </span>
+          )}
         </div>
 
         {related.length > 0 && (

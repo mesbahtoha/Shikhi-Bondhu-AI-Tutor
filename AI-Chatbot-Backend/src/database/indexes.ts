@@ -141,8 +141,10 @@ export async function ensureIndexes(): Promise<void> {
       questionType: 1,
     }),
     PracticeQuestionSetModel.collection.createIndex({ publicationState: 1, 'chapters.id': 1 }),
+    PracticeQuestionSetModel.collection.createIndex({ autoSeedKey: 1 }, { unique: true, sparse: true }),
     PracticeQuestionModel.collection.createIndex({ setId: 1, order: 1 }),
     PracticeQuestionModel.collection.createIndex({ setId: 1, chapterId: 1 }),
+    PracticeQuestionModel.collection.createIndex({ autoSeedKey: 1 }, { unique: true, sparse: true }),
     PracticeAttemptModel.collection.createIndex({ userId: 1, createdAt: -1 }),
     PracticeAttemptModel.collection.createIndex({ setId: 1, status: 1 }),
     PracticeAttemptModel.collection.createIndex({ status: 1, expiresAt: 1 })

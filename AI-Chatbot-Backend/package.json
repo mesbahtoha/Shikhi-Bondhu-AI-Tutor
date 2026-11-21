@@ -14,6 +14,7 @@
     "test:practice": "tsx tests/practice.ts",
     "test:practice-api": "tsx tests/practice-api.ts",
     "db:remove-demo-practice": "tsx scripts/remove-demo-practice-data.ts",
+    "db:seed-practice": "tsx scripts/seed-practice.ts",
     "db:fix-chunks": "tsx scripts/fix-corrupt-chunks.ts",
     "test:docs": "tsx tests/docs.ts",
     "vercel-build": "npm run build"

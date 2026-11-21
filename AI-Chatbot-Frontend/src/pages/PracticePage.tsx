@@ -219,6 +219,9 @@ export function PracticePage() {
           {step === 3 && (
             <>
               <h2 style={{ marginTop: 0 }}>Step 3: Choose question type</h2>
+              <p style={{ margin: '0 0 12px', color: 'var(--text-secondary)', fontSize: 13.5 }}>
+                All seven types are ready for every chapter. Questions are taken from the book and can be edited later in the admin panel.
+              </p>
               <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
                 {QUESTION_TYPES.map((type) => (
                   <button

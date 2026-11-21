@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-do
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { ProtectedRoute, AdminRoute, PublicOnlyRoute } from '@/routes/guards';
+import { AdminRoute, PublicOnlyRoute } from '@/routes/guards';
 import { FullPageSpinner } from '@/components/ui/Spinner';
 import { useAuthStore } from '@/store/auth.store';
 import { useChatStore } from '@/store/chat.store';
@@ -91,6 +91,7 @@ export default function App() {
           <Route path="/learn/:lessonId" element={<LearnPage />} />
           <Route path="/learn" element={<LearnPage />} />
           <Route path="/practice" element={<PracticePage />} />
+          <Route path="/practice/attempt/:attemptId" element={<PracticeAttemptPage />} />
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
@@ -106,10 +107,6 @@ export default function App() {
           <Route path="/share/:token" element={<ShareView />} />
           <Route path="/chat" element={<LegacyChatRedirect />} />
           <Route path="/chat/:id" element={<LegacyChatRedirect />} />
-        </Route>
-
-        <Route element={<ProtectedRoute />}>
-          <Route path="/practice/attempt/:attemptId" element={<PracticeAttemptPage />} />
         </Route>
 
         <Route element={<AdminRoute />}>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { MdArrowForward, MdCheck, MdMenuBook, MdStar, MdGroups, MdQuiz } from 'react-icons/md';
 import { Mascot } from '@/components/landing/Mascot';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import { useLang } from '@/lib/i18n';
 
 export function LandingPage() {
@@ -122,8 +123,8 @@ export function LandingPage() {
               <Mascot size={64} mood="cheer" />
               <div><strong>{t('action.tryNow')}</strong><p>{bn ? 'Unit 3, Lesson 5, Page 45' : 'Unit 3, Lesson 5, Page 45'}</p></div>
             </div>
-            <div className="pg-result-bubble"><span className="pg-result-icon">1</span><div style={{ fontWeight: 700 }}>Unit 3, Lesson 5, Page 45, Match the requests</div></div>
-            <div className="pg-result-bubble correct"><span className="pg-result-icon">OK</span><div>{bn ? '৫টি মিল বাংলাসহ সমাধান। ছবি লাগে না।' : 'All 5 matches solved with Bangla meaning. No photo needed.'}</div></div>
+            <div className="pg-result-bubble"><span className="pg-result-icon">1</span><div style={{ fontWeight: 700 }}>Unit 3 · Lesson 5 · Page 45 — Match the requests</div></div>
+            <div className="pg-result-bubble correct"><span className="pg-result-icon">OK</span><div>{bn ? 'বইয়ের ঠিক পৃষ্ঠা থেকে ৫টি মিল একসাথে সমাধান, প্রতিটির সহজ বাংলা অর্থ আর শেষে ১টি অনুশীলন। ছবি লাগে না।' : 'All 5 requests matched from the exact page, each reply explained in easy Bangla, plus a quick practice. No photo needed.'}</div></div>
             <button className="pg-btn-candy full" onClick={() => navigate('/tutor')}>{t('action.askTutor')}</button>
           </div>
         </div>
@@ -170,6 +171,14 @@ export function LandingPage() {
             </button>
           ))}
         </div>
+        <div className="pg-card brand-strip" aria-label="Shikhi Bondhu brand promise">
+          <BrandLogo size={46} tagline={bn ? 'প্রতিটি উত্তর তোমার নিজের বই থেকে' : 'Every answer comes from your own book'} />
+          <div className="brand-strip-chips">
+            <span className="pg-badge pg-badge-mint">{bn ? 'NCTB তৃতীয় শ্রেণি' : 'NCTB Class 3'}</span>
+            <span className="pg-badge pg-badge-yellow">{bn ? 'বইভিত্তিক ও নিরাপদ' : 'Book-grounded & safe'}</span>
+            <span className="pg-badge pg-badge-pink">{bn ? 'মোবাইল-বান্ধব' : 'Mobile friendly'}</span>
+          </div>
+        </div>
       </section>
 
       {/* 5. Live preview CTA */}
@@ -177,8 +186,8 @@ export function LandingPage() {
         <div className="preview-grid">
           <div className="pg-card pg-card-yellow-shadow preview-card">
             <strong>{bn ? 'একজন শিশু জিজ্ঞেস করে' : 'A child asks'}</strong>
-            <div className="pg-result-bubble"><span className="pg-result-icon">You</span><div style={{ fontWeight: 700 }}>Unit 3, Lesson 5, Activity C, Match the requests, Page 45.</div></div>
-            <div className="pg-result-bubble correct"><span className="pg-result-icon">OK</span><div>{bn ? 'শিখি বন্ধু ৫টি মিল একসাথে বাংলাসহ সমাধান করে।' : 'Shikhi Bondhu solves all 5 matches at once, with Bangla meaning.'}</div></div>
+            <div className="pg-result-bubble"><span className="pg-result-icon">You</span><div style={{ fontWeight: 700 }}>Unit 3 · Lesson 5 · Activity C — Match the requests, Page 45.</div></div>
+            <div className="pg-result-bubble correct"><span className="pg-result-icon">OK</span><div>{bn ? 'শিখি বন্ধু ৫টি মিল একসাথে সমাধান করে, প্রতিটি উত্তর সহজ বাংলায় বোঝায় আর শেষে ১টি অনুশীলন দেয়।' : 'Shikhi Bondhu solves all 5 matches in one go, explains every reply in easy Bangla, and ends with one practice question.'}</div></div>
           </div>
           <div className="pg-card preview-card preview-cta">
             <Mascot size={56} />

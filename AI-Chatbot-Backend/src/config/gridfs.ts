@@ -65,6 +65,8 @@ export interface StoredFileInfo {
   _id: ObjectIdType;
   contentType: string;
   filename: string;
+  length: number;
+  chunkSize: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -82,6 +84,8 @@ export async function findFile(fileId: string | ObjectIdType): Promise<StoredFil
     _id: doc._id as ObjectIdType,
     contentType: doc.contentType || 'application/octet-stream',
     filename: doc.filename || 'file',
+    length: Number(doc.length ?? 0),
+    chunkSize: Number(doc.chunkSize ?? 0),
     metadata: doc.metadata || {},
   };
 }
@@ -89,11 +93,12 @@ export async function findFile(fileId: string | ObjectIdType): Promise<StoredFil
 /** Streams a stored file to an Express response. */
 export function streamFile(
   res: import('express').Response,
-  fileId: string | ObjectIdType
+  fileId: string | ObjectIdType,
+  options: { start?: number; end?: number } = {}
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     bucket()
-      .openDownloadStream(safeObjectId(fileId)!)
+      .openDownloadStream(safeObjectId(fileId)!, options)
       .on('error', reject)
       .on('end', () => resolve())
       .pipe(res);

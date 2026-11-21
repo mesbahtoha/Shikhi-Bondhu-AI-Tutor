@@ -228,6 +228,8 @@ export interface BookInfo {
   chunkCount?: number;
   pageCount?: number;
   updatedAt?: string;
+  hasDownload?: boolean;
+  downloadUrl?: string | null;
 }
 
 export interface AdminBook extends BookInfo {

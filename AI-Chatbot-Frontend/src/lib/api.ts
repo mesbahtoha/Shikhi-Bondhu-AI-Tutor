@@ -3,6 +3,27 @@ import type { ApiError, AttemptResponse, PracticeAttempt, PracticeBookSummary, P
 
 const ACCESS_KEY = 'nf_access_token';
 const REFRESH_KEY = 'nf_refresh_token';
+const PRACTICE_GUEST_KEY = 'sb_practice_guest';
+
+/**
+ * A private, device-scoped id that lets a visitor start and finish a practice
+ * attempt without creating an account. The server hashes this value; it never
+ * becomes an account identity.
+ */
+export function getPracticeGuestId(): string {
+  try {
+    const existing = localStorage.getItem(PRACTICE_GUEST_KEY);
+    if (existing && /^[a-f0-9-]{16,64}$/i.test(existing)) return existing;
+    const created =
+      typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+    localStorage.setItem(PRACTICE_GUEST_KEY, created);
+    return created;
+  } catch {
+    return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+  }
+}
 
 export const tokenStore = {
   get access() {
@@ -37,6 +58,11 @@ export const api = axios.create({
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = tokenStore.access;
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Practice works for signed-out visitors too. The header is only sent to
+  // the student practice API, never to admin or chat routes.
+  if (config.url?.startsWith('/api/v1/practice/')) {
+    config.headers['x-practice-guest'] = getPracticeGuestId();
+  }
   return config;
 });
 

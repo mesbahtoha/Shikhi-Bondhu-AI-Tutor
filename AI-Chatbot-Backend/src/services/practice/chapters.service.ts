@@ -63,7 +63,7 @@ export async function listChaptersForBook(bookId: string): Promise<ChapterRef[]>
     .map(({ id, title, order }) => ({ id, title, order }));
 
   if (chapters.length === 0) {
-    return [{ id: 'general', title: 'General', order: 0 }];
+    return [{ id: 'general', title: 'All units', order: 0 }];
   }
 
   return chapters;

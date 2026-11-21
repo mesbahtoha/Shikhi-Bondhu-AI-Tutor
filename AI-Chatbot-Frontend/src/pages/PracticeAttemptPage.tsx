@@ -16,7 +16,39 @@ function payloadText(payload: StudentQuestionPayload | null | undefined): string
   if (typeof p.statement === 'string') return p.statement;
   if (typeof p.source === 'string') return p.source;
   if (typeof p.text === 'string') return p.text.replace(/\{\{\d+\}\}/g, '____');
+  if (Array.isArray(p.left) && Array.isArray(p.right)) return 'Match Column A with Column B.';
+  if (Array.isArray(p.items)) return 'Put the words in the correct order.';
   return 'Question';
+}
+
+/** Renders fill-in-the-blank text with visible, styled blanks. */
+function FillBlankSentence({ text }: { text: string }) {
+  const parts = text.split(/(\{\{\d+\}\})/g).filter(Boolean);
+  return (
+    <p style={{ margin: 0, fontWeight: 700, lineHeight: 1.9 }}>
+      {parts.map((part, index) =>
+        /^\{\{\d+\}\}$/.test(part) ? (
+          <span
+            key={`${part}-${index}`}
+            aria-hidden="true"
+            style={{
+              display: 'inline-block',
+              minWidth: 54,
+              margin: '0 4px',
+              borderBottom: '2px dashed var(--border-strong)',
+              color: 'var(--text-muted)',
+              textAlign: 'center',
+              fontWeight: 800,
+            }}
+          >
+            ____
+          </span>
+        ) : (
+          <span key={index}>{part}</span>
+        )
+      )}
+    </p>
+  );
 }
 
 function payloadOptions(payload: StudentQuestionPayload | null | undefined): string[] {
@@ -227,8 +259,24 @@ export function PracticeAttemptPage() {
   }
 
 
-  function isEmptyValue(value: unknown): boolean {
+  function isEmptyValue(value: unknown, questionType?: string): boolean {
     if (value === null || value === undefined) return true;
+    if (questionType === 'matching') {
+      const pairs = (value as { pairs?: Array<{ leftId?: string; rightId?: string }> }).pairs;
+      return !Array.isArray(pairs) || pairs.filter((pair) => pair?.leftId && pair?.rightId).length === 0;
+    }
+    if (questionType === 'fill_blank') {
+      const blanks = (value as { blanks?: string[] }).blanks;
+      return !Array.isArray(blanks) || blanks.every((blank) => String(blank ?? '').trim().length === 0);
+    }
+    if (questionType === 'rearrange') {
+      const order = (value as { order?: string[] }).order;
+      return !Array.isArray(order) || order.length === 0;
+    }
+    if (questionType === 'one_word' || questionType === 'translation') {
+      const text = (value as { text?: string }).text;
+      return String(text ?? '').trim().length === 0;
+    }
     if (Array.isArray(value)) return value.length === 0;
     if (typeof value === 'object') {
       const record = value as Record<string, unknown>;
@@ -242,7 +290,7 @@ export function PracticeAttemptPage() {
     return String(value).trim().length === 0;
   }
 
-  const answeredQuestions = questions.filter((question) => !isEmptyValue(answers[question.questionId])).length;
+  const answeredQuestions = questions.filter((question) => !isEmptyValue(answers[question.questionId], question.questionType)).length;
   const unansweredQuestions = questions.length - answeredQuestions;
 
   if (attempt.status === 'submitted') {
@@ -269,7 +317,15 @@ export function PracticeAttemptPage() {
         </div>
 
         <div className="progress-track" style={{ height: 10, borderRadius: 999, background: 'var(--surface-cream)', margin: '14px 0', overflow: 'hidden' }}>
-          <div className="progress-fill" style={{ height: 100, background: 'var(--accent-candy)', width: '100%' }} />
+          <div
+            className="progress-fill"
+            style={{
+              height: '100%',
+              background: 'var(--accent-candy)',
+              width: `${questions.length > 0 ? Math.round((answeredQuestions / questions.length) * 100) : 0}%`,
+              transition: 'width .25s ease',
+            }}
+          />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
@@ -293,7 +349,7 @@ export function PracticeAttemptPage() {
             <h3 style={{ marginTop: 0 }}>Answer sheet</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
               {questions.map((question, index) => {
-                const answered = !isEmptyValue(answers[question.questionId]);
+                const answered = !isEmptyValue(answers[question.questionId], question.questionType);
                 return (
                   <button
                     key={question.questionId}
@@ -439,24 +495,33 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
     }
 
     case 'fill_blank': {
-      const blanks = splitFillBlanks(payloadText(question.payload));
+      const text = payloadText(question.payload);
+      const blanks = splitFillBlanks(text);
       const studentBlanks = Array.isArray((current as { blanks?: string[] }).blanks) ? ((current as { blanks?: string[] }).blanks as string[]) : blanks.map(() => '');
       content = (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <p style={{ margin: 0, fontWeight: 700 }}>{payloadText(question.payload)}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <FillBlankSentence text={text} />
           {blanks.map((_, blankIndex) => (
-            <input
-              key={blankIndex}
-              className="input"
-              style={{ maxWidth: 320 }}
-              placeholder={`Answer ${blankIndex + 1}`}
-              value={studentBlanks[blankIndex] ?? ''}
-              onChange={(event) => {
-                const next = [...studentBlanks];
-                next[blankIndex] = event.target.value;
-                onChange({ blanks: next });
-              }}
-            />
+            <label key={blankIndex} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontWeight: 700, fontSize: 13 }}>
+              Blank {blankIndex + 1}
+              <input
+                className="input"
+                inputMode="text"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                enterKeyHint="next"
+                aria-label={`Blank ${blankIndex + 1} answer`}
+                style={{ maxWidth: 360 }}
+                placeholder={`Type answer ${blankIndex + 1}`}
+                value={studentBlanks[blankIndex] ?? ''}
+                onChange={(event) => {
+                  const next = [...studentBlanks];
+                  next[blankIndex] = event.target.value;
+                  onChange({ blanks: next });
+                }}
+              />
+            </label>
           ))}
         </div>
       );
@@ -498,6 +563,9 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
       content = (
         <div style={{ display: 'grid', gap: 12 }}>
           <p style={{ margin: 0, fontWeight: 700 }}>{payloadText(question.payload)}</p>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>
+            Tap a word in Column A, then tap its match in Column B.
+          </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
             <div>
               <strong>Column A</strong>
@@ -551,7 +619,29 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
       break;
     }
 
-    case 'one_word':
+    case 'one_word': {
+      const text = typeof current.text === 'string' ? current.text : '';
+      content = (
+        <div>
+          <input
+            className="input"
+            type="text"
+            value={text}
+            onChange={(event) => onChange({ text: event.target.value })}
+            placeholder="Type one word…"
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="done"
+            aria-label="One word answer"
+            style={{ maxWidth: 360 }}
+          />
+        </div>
+      );
+      break;
+    }
+
     case 'translation': {
       const text = typeof current.text === 'string' ? current.text : '';
       content = (
@@ -561,7 +651,10 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
             rows={3}
             value={text}
             onChange={(event) => onChange({ text: event.target.value })}
-            placeholder="Type your answer here…"
+            placeholder="Type the translation here…"
+            autoComplete="off"
+            spellCheck={false}
+            aria-label="Translation answer"
           />
         </div>
       );
@@ -582,12 +675,15 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
       };
       content = (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>
+            Use the arrow buttons to move each word into the correct order.
+          </p>
           {items.map((item, index) => (
             <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontWeight: 700, minWidth: 24 }}>{index + 1}.</span>
               <span style={{ flex: 1 }}>{item.text}</span>
-              <button type="button" className="pg-btn-secondary" disabled={index === 0} onClick={() => move(index, -1)}>↑</button>
-              <button type="button" className="pg-btn-secondary" disabled={index === order.length - 1} onClick={() => move(index, 1)}>↓</button>
+              <button type="button" className="pg-btn-secondary" aria-label={`Move ${item.text} up`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button>
+              <button type="button" className="pg-btn-secondary" aria-label={`Move ${item.text} down`} disabled={index === order.length - 1} onClick={() => move(index, 1)}>↓</button>
             </div>
           ))}
         </div>
