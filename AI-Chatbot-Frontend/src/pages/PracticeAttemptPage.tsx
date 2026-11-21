@@ -163,7 +163,6 @@ export function PracticeAttemptPage() {
     () => (Array.isArray(attempt?.questions) ? attempt.questions.filter((question): question is AttemptQuestion => Boolean(question && typeof question === 'object')) : []),
     [attempt]
   );
-  const savedAnswers = useMemo(() => (attempt && Array.isArray(attempt.answers) ? attempt.answers : []), [attempt]);
   const isExam = attempt?.mode === 'exam';
 
   // Countdown ticks once a second while an exam is running.
@@ -229,15 +228,8 @@ export function PracticeAttemptPage() {
     return String(value).trim().length === 0;
   }
 
-  const answeredQuestions = questions.filter((question) => {
-    const answer = savedAnswers.find((entry) => String(entry.questionId) === question.questionId);
-    return answer ? !isEmptyValue(answer.value) : false;
-  }).length;
-
-  const unansweredQuestions = questions.filter((question) => {
-    const answer = savedAnswers.find((entry) => String(entry.questionId) === question.questionId);
-    return !answer || isEmptyValue(answer.value);
-  }).length;
+  const answeredQuestions = questions.filter((question) => !isEmptyValue(answers[question.questionId])).length;
+  const unansweredQuestions = questions.length - answeredQuestions;
 
   if (attempt.status === 'submitted') {
     return <AttemptResults attempt={attempt} answers={answers} questions={questions} onRetake={() => navigate('/practice')} />;
@@ -272,7 +264,7 @@ export function PracticeAttemptPage() {
                 key={question.questionId}
                 question={question}
                 index={index}
-                value={savedAnswers.find((entry) => String(entry.questionId) === question.questionId)?.value}
+                value={answers[question.questionId]}
                 onChange={(value) => setAnswer(question.questionId, value)}
                 showFeedback={attempt.mode === 'practice'}
                 checkResult={checkResults[question.questionId]}
@@ -286,7 +278,7 @@ export function PracticeAttemptPage() {
             <h3 style={{ marginTop: 0 }}>Answer sheet</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
               {questions.map((question, index) => {
-                const answered = !!savedAnswers.find((entry) => String(entry.questionId) === question.questionId) && !isEmptyValue(savedAnswers.find((entry) => String(entry.questionId) === question.questionId)?.value);
+                const answered = !isEmptyValue(answers[question.questionId]);
                 return (
                   <button
                     key={question.questionId}
