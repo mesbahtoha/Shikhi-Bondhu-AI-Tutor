@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { FaFileAlt, FaFilePdf, FaFileImage, FaPlus } from 'react-icons/fa';
 import { MdDelete, MdRefresh } from 'react-icons/md';
@@ -10,6 +10,7 @@ import { TableSkeleton } from '@/components/ui/Skeleton';
 import { Field, Input, Select, Textarea } from '@/components/ui/Form';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { Pagination } from '@/components/ui/Pagination';
 import { formatDate } from '@/lib/format';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -38,6 +39,8 @@ function typeIcon(notice: NoticeRow) {
 export function AdminNotices() {
   const confirm = useConfirm();
   const [notices, setNotices] = useState<NoticeRow[]>([]);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -62,6 +65,13 @@ export function AdminNotices() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const pageCount = Math.max(1, Math.ceil(notices.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const visibleNotices = useMemo(
+    () => notices.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [notices, safePage]
+  );
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,7 +179,7 @@ export function AdminNotices() {
                 </tr>
               </thead>
               <tbody>
-                {notices.map((notice) => (
+                {visibleNotices.map((notice) => (
                   <tr key={notice._id}>
                     <td>
                       <div className="flex items-center gap-2" style={{ minWidth: 220 }}>
@@ -220,6 +230,11 @@ export function AdminNotices() {
                 ))}
               </tbody>
             </table>
+            {notices.length > PAGE_SIZE && (
+              <div style={{ padding: 10 }}>
+                <Pagination page={safePage} total={notices.length} limit={PAGE_SIZE} onChange={setPage} />
+              </div>
+            )}
           </div>
         )}
       </div>
