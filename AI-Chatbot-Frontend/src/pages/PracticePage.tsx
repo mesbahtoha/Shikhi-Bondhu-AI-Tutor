@@ -161,15 +161,15 @@ export function PracticePage() {
                         textAlign: 'left',
                         padding: 14,
                         cursor: 'pointer',
-                        border: bookId === book._id ? '2px solid var(--accent-candy)' : '1px solid var(--border-color)',
-                        background: bookId === book._id ? 'var(--surface-mint-soft)' : undefined,
+                        border: bookId === book._id ? '2px solid var(--pg-yellow)' : '1px solid var(--border-color)',
+                        background: bookId === book._id ? 'var(--pg-yellow-soft)' : undefined,
                       }}
                     >
                       <span>
                         <strong>{book.title}</strong>
                         <span style={{ marginLeft: 8, color: 'var(--text-secondary)', fontSize: 13 }}>{book.subject} · Class 3</span>
                       </span>
-                      {bookId === book._id && <span className="pg-badge pg-badge-mint">✓ Selected</span>}
+                      {bookId === book._id && <span className="pg-badge pg-badge-yellow">✓ Selected</span>}
                     </button>
                   ))}
                 </div>

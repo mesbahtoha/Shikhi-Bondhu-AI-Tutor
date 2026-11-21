@@ -329,13 +329,13 @@ export function PracticeQuestionBuilder({ open, onClose, onSaved, set, existingQ
                       alignItems: 'center',
                       padding: '8px 10px',
                       borderRadius: 12,
-                      border: `1.5px solid ${selected ? 'var(--color-primary)' : 'var(--border-color)'}`,
-                      background: selected ? 'var(--color-primary-soft)' : 'var(--bg-surface)',
+                      border: `1.5px solid ${selected ? 'var(--color-warning)' : 'var(--border-color)'}`,
+                      background: selected ? 'var(--surface-yellow-soft)' : 'var(--bg-surface)',
                       transition: 'border-color 0.15s ease, background 0.15s ease',
                     }}
                   >
                     <label
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }}
+                      className="choice-control"
                       title="Mark this option as the correct answer"
                     >
                       <input
@@ -344,8 +344,8 @@ export function PracticeQuestionBuilder({ open, onClose, onSaved, set, existingQ
                         checked={selected}
                         onChange={() => update({ correctIndex: index })}
                         aria-label={`Option ${index + 1} is correct`}
-                        style={{ width: 18, height: 18, margin: 0 }}
                       />
+                      <span className="choice-box" aria-hidden="true">✓</span>
                       <span className="text-muted small" style={{ whiteSpace: 'nowrap' }}>Correct</span>
                     </label>
                     <Input
@@ -359,7 +359,7 @@ export function PracticeQuestionBuilder({ open, onClose, onSaved, set, existingQ
                         update({ options: next });
                       }}
                     />
-                    {selected && <Badge variant="primary">Selected</Badge>}
+                    {selected && <Badge variant="warning">Selected</Badge>}
                     <Button variant="secondary" onClick={() => removeOption(index)} disabled={state.options.length <= 2}>Remove</Button>
                   </div>
                 );

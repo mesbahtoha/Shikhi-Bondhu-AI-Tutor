@@ -345,12 +345,14 @@ function SelectableOption({
   selected,
   onClick,
   children,
-  selectedBackground = 'var(--surface-mint-soft)',
+  selectedBackground = 'var(--pg-yellow-soft)',
+  selectedBorder = 'var(--pg-yellow)',
 }: {
   selected: boolean;
   onClick: () => void;
   children: ReactNode;
   selectedBackground?: string;
+  selectedBorder?: string;
 }) {
   return (
     <button
@@ -361,7 +363,7 @@ function SelectableOption({
         justifyContent: 'flex-start',
         gap: 10,
         borderWidth: selected ? 2 : 1,
-        borderColor: selected ? 'var(--accent-candy)' : undefined,
+        borderColor: selected ? selectedBorder : undefined,
         background: selected ? selectedBackground : undefined,
         textAlign: 'left',
       }}
@@ -370,20 +372,24 @@ function SelectableOption({
       <span
         aria-hidden="true"
         style={{
-          width: 18,
-          height: 18,
-          borderRadius: '50%',
-          border: `2px solid ${selected ? 'var(--accent-candy)' : 'var(--border-strong)'}`,
+          width: 20,
+          height: 20,
+          borderRadius: 6,
+          border: `2px solid ${selected ? selectedBorder : 'var(--border-strong)'}`,
+          background: selected ? selectedBorder : 'transparent',
+          color: selected ? '#1E293B' : 'transparent',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
+          fontSize: 13,
+          fontWeight: 900,
+          lineHeight: 1,
           flexShrink: 0,
         }}
       >
-        {selected && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-candy)' }} />}
+        ✓
       </span>
       <span style={{ flex: 1 }}>{children}</span>
-      {selected && <span aria-hidden="true" style={{ fontWeight: 900, color: 'var(--success-text)' }}>✓</span>}
     </button>
   );
 }
@@ -497,6 +503,7 @@ function AttemptQuestionCard({ question, index, value, onChange, showFeedback = 
                     key={item.id}
                     selected={Boolean(selectedLeftId) && pairs.some((pair) => pair.leftId === selectedLeftId && pair.rightId === item.id)}
                     selectedBackground="var(--surface-pink-soft)"
+                    selectedBorder="var(--pg-pink)"
                     onClick={() => {
                       if (selectedLeftId) setPair(selectedLeftId, item.id);
                     }}

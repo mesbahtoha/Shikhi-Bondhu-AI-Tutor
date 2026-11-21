@@ -39,6 +39,7 @@
   --surface-accent: #f4f0ff;
   --surface-mint-soft: #d1fae5;
   --surface-pink-soft: #fce7f3;
+  --surface-yellow-soft: #fef3c7;
 
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
@@ -90,6 +91,7 @@ html[data-theme='dark'] {
   --surface-accent: #1a2340;
   --surface-mint-soft: #123327;
   --surface-pink-soft: #331a26;
+  --surface-yellow-soft: #3a2e0b;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
@@ -408,6 +410,49 @@ input[type='checkbox'] {
 input[type='radio']:disabled,
 input[type='checkbox']:disabled {
   cursor: not-allowed;
+}
+
+/* Custom radio used to mark the correct answer in the MCQ editor. */
+.choice-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.choice-control input[type='radio'] {
+  position: absolute;
+  inset: 0;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.choice-control .choice-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.choice-control input[type='radio']:focus-visible + .choice-box {
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+.choice-control input[type='radio']:checked + .choice-box {
+  background: var(--color-warning);
+  border-color: var(--color-warning);
+  color: #1e293b;
 }
 
 /* Badges */
@@ -2131,8 +2176,12 @@ body.drawer-open {
   --pg-accent-dark: #7C3AED;
   --pg-pink: #F472B6;
   --pg-yellow: #FBBF24;
+  --pg-yellow-soft: #FEF3C7;
   --pg-mint: #34D399;
   --pg-border-soft: #E2E8F0;
+  /* Legacy aliases used by the practice pages. */
+  --surface-cream: #FFF8E1;
+  --accent-candy: #FBBF24;
   --pg-radius-sm: 8px;
   --pg-radius-md: 16px;
   --pg-radius-lg: 24px;
