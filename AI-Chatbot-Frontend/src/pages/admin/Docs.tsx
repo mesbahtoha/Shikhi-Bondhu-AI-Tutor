@@ -12,6 +12,7 @@ import {
   getAdminDocs,
   getAdminTeamAvatarUrl,
   getErrorMessage,
+  invalidateDocsMeta,
   listAdminDocVersions,
   publishAdminDocs,
   restoreAdminDocVersion,
@@ -233,6 +234,7 @@ export function DocsAdminPage() {
         roadmap: data.doc.roadmap ?? [],
         changelog: data.doc.changelog ?? [],
       });
+      invalidateDocsMeta();
       toast.success(`Published version ${data.publishedVersion}. Public documentation is enabled.`);
       await refresh(true);
     } catch (err) {
@@ -263,6 +265,7 @@ export function DocsAdminPage() {
     try {
       const state = await unpublishAdminDocs();
       setAdmin(state);
+      invalidateDocsMeta();
       toast.success('Public documentation is offline. Draft and version history are preserved.');
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -284,6 +287,7 @@ export function DocsAdminPage() {
     try {
       const state = await setAdminDocsEnabled(enabled);
       setAdmin(state);
+      invalidateDocsMeta();
       toast.success(enabled ? 'Public documentation enabled.' : 'Public documentation disabled.');
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -551,6 +555,7 @@ export function DocsAdminPage() {
                       timezone: schedule.timezone,
                     });
                     setAdmin(state);
+                    invalidateDocsMeta();
                     toast.success('Schedule saved. The server enforces this window immediately.');
                   } catch (err) {
                     toast.error(getErrorMessage(err));
@@ -560,6 +565,7 @@ export function DocsAdminPage() {
                   try {
                     const state = await setAdminDocsSchedule({ start: null, end: null, timezone });
                     setAdmin(state);
+                    invalidateDocsMeta();
                     toast.success('Schedule cleared. Documentation is available whenever public access is on.');
                   } catch (err) {
                     toast.error(getErrorMessage(err));

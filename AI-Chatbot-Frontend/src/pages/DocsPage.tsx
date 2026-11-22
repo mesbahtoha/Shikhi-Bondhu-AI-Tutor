@@ -539,11 +539,11 @@ export function DocsPage() {
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState<{ title: string; description: string } | null>(null);
 
-  const loadStats = useCallback(async () => {
+  const loadStats = useCallback(async (force = false) => {
     setStatsRefreshing(true);
     setStatsError(null);
     try {
-      setStats(await getDocsStats());
+      setStats(await getDocsStats({ force }));
     } catch (err) {
       setStatsError(getErrorMessage(err));
     } finally {
@@ -587,7 +587,7 @@ export function DocsPage() {
 
       const docsContent = await getDocsContent();
       setContent(docsContent);
-      void loadStats();
+      void loadStats(false);
     } catch (err) {
       const status = err instanceof ApiRequestError ? err.status : 0;
       if (status === 403 || status === 404) {
@@ -611,7 +611,7 @@ export function DocsPage() {
   useEffect(() => {
     if (!content) return;
     const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void loadStats();
+      if (document.visibilityState === 'visible') void loadStats(true);
     }, 60_000);
     return () => window.clearInterval(timer);
   }, [content, loadStats]);
@@ -654,7 +654,7 @@ export function DocsPage() {
       stats={stats}
       statsError={statsError}
       statsRefreshing={statsRefreshing}
-      onRefreshStats={loadStats}
+      onRefreshStats={() => void loadStats(true)}
     />
   );
 }

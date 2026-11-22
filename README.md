@@ -877,6 +877,10 @@ It renders only a **published snapshot**; the editable draft stays private.
 - **Search and navigation**: a sticky desktop sidebar and sticky mobile section bar (the bar
   pins below the site header while scrolling), anchor links, active-section tracking and
   full-text section filtering.
+- **Fast lazy load**: the `/docs` route chunk and its metadata/content/statistics are prefetched
+  on link hover or shortly after idle. Short-lived shared caches prevent duplicate
+  `/docs/meta` calls between the navbar and the page, so local navigation verification
+  renders in roughly 200–350 ms instead of showing a long skeleton.
 - **Exports**: Markdown download and browser print-to-PDF, both generated from the currently
   published snapshot. API groups are expanded for printing.
 - **Sharing**: the public URL and current section anchor can be copied from the page.
@@ -952,7 +956,7 @@ Expected results: `test:tutor` → `72 passed, 0 failed`; `test:practice` →
 `20 passed, 0 failed`; `test:docs` → `59 passed, 0 failed` with MongoDB reachable
 (the DB block is skipped when `MONGO_URI` is unset).
 
-The documentation module was also verified in a real browser with Playwright:
+The application was also verified in a real browser with Playwright:
 
 - public `/docs` desktop (1440 px), tablet/mobile (390 px) and Bangla layout;
 - disabled and scheduled visibility states;
@@ -960,7 +964,11 @@ The documentation module was also verified in a real browser with Playwright:
 - unpublished draft isolation from the public snapshot;
 - statistics loading/unavailable states;
 - Markdown export contents and section search;
-- no horizontal page overflow or runtime console errors.
+- no horizontal page overflow or runtime console errors;
+- a final route audit across 13 public routes × 4 widths and 15 admin routes × 3 widths;
+- sticky navigation at desktop (`84px`), tablet (`68px`) and mobile (`60px`);
+- `/docs` prefetch verified: one metadata request, no duplicate calls, and ~250 ms
+  in-browser navigation on the local production build.
 
 ---
 

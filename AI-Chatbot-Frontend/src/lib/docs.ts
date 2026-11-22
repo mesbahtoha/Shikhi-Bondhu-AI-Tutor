@@ -4,18 +4,100 @@ import type { DocsContent, DocsDraft, DocsMeta, PublicDocStats, AdminDocs, DocsT
 
 /** Docs public-site API helpers. */
 
-export async function getDocsMeta(): Promise<DocsMeta> {
-  return apiGet<DocsMeta>('/api/v1/docs/meta');
+interface DocsMetaCache {
+  value: DocsMeta;
+  at: number;
 }
 
-export async function getDocsContent(): Promise<DocsContent> {
-  const { content } = await apiGet<{ content: DocsContent }>('/api/v1/docs/content');
-  return content;
+interface DocsContentCache {
+  value: DocsContent;
+  at: number;
 }
 
-export async function getDocsStats(): Promise<PublicDocStats> {
-  const { stats } = await apiGet<{ stats: PublicDocStats }>('/api/v1/docs/stats');
-  return stats;
+interface DocsStatsCache {
+  value: PublicDocStats;
+  at: number;
+}
+
+let metaCache: DocsMetaCache | null = null;
+let metaInFlight: Promise<DocsMeta> | null = null;
+let contentCache: DocsContentCache | null = null;
+let contentInFlight: Promise<DocsContent> | null = null;
+let statsCache: DocsStatsCache | null = null;
+let statsInFlight: Promise<PublicDocStats> | null = null;
+const META_CACHE_MS = 15_000;
+const CONTENT_CACHE_MS = 15_000;
+const STATS_CACHE_MS = 10_000;
+
+/**
+ * Small shared cache so the global navbar and the /docs page do not issue the
+ * same metadata request back-to-back. Pass `{ force: true }` after focus or an
+ * admin visibility change.
+ */
+export async function getDocsMeta(options?: { force?: boolean }): Promise<DocsMeta> {
+  if (!options?.force && metaCache && Date.now() - metaCache.at < META_CACHE_MS) {
+    return metaCache.value;
+  }
+  if (metaInFlight) return metaInFlight;
+
+  metaInFlight = apiGet<DocsMeta>('/api/v1/docs/meta')
+    .then((value) => {
+      metaCache = { value, at: Date.now() };
+      return value;
+    })
+    .finally(() => {
+      metaInFlight = null;
+    });
+  return metaInFlight;
+}
+
+/** Clears published content/statistics caches without touching visibility metadata. */
+export function invalidateDocsData(): void {
+  contentCache = null;
+  contentInFlight = null;
+  statsCache = null;
+  statsInFlight = null;
+}
+
+/** Call after publish/unpublish/schedule changes so the public nav refreshes. */
+export function invalidateDocsMeta(): void {
+  metaCache = null;
+  metaInFlight = null;
+  invalidateDocsData();
+}
+
+export async function getDocsContent(options?: { force?: boolean }): Promise<DocsContent> {
+  if (!options?.force && contentCache && Date.now() - contentCache.at < CONTENT_CACHE_MS) {
+    return contentCache.value;
+  }
+  if (contentInFlight) return contentInFlight;
+
+  contentInFlight = apiGet<{ content: DocsContent }>('/api/v1/docs/content')
+    .then(({ content }) => {
+      contentCache = { value: content, at: Date.now() };
+      return content;
+    })
+    .finally(() => {
+      contentInFlight = null;
+    });
+  return contentInFlight;
+}
+
+export async function getDocsStats(options?: { force?: boolean }): Promise<PublicDocStats> {
+  if (!options?.force && statsCache && Date.now() - statsCache.at < STATS_CACHE_MS) {
+    return statsCache.value;
+  }
+  if (statsInFlight) return statsInFlight;
+
+  statsInFlight = apiGet<{ stats: PublicDocStats }>('/api/v1/docs/stats')
+    .then(({ stats }) => {
+      statsCache = { value: stats, at: Date.now() };
+      return stats;
+    })
+    .finally(() => {
+      statsInFlight = null;
+    });
+  return statsInFlight;
 }
 
 export function getTeamAvatarUrl(memberId: string, version?: string): string {

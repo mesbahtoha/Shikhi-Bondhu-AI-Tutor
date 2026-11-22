@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ThemeLangControls } from '@/components/ui/ThemeLangControls';
 import { BrandLogo, BrandMark } from '@/components/brand/BrandLogo';
 import { useLang } from '@/lib/i18n';
-import { getDocsMeta } from '@/lib/docs';
+import { getDocsMeta, invalidateDocsData } from '@/lib/docs';
+import { prefetchDocsData } from '@/lib/docsPrefetch';
 
 export function PublicLayout() {
   const user = useAuthStore((s) => s.user);
@@ -17,6 +18,7 @@ export function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [docsVisible, setDocsVisible] = useState(false);
+  const docsVersionRef = useRef<number | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const { t, lang } = useLang();
   const authed = status === 'authenticated' && !!user;
@@ -27,19 +29,24 @@ export function PublicLayout() {
   // accessible published snapshot (enabled + published + inside its window).
   useEffect(() => {
     let active = true;
-    const sync = () => {
-      getDocsMeta()
+    const sync = (force = false) => {
+      getDocsMeta({ force })
         .then((meta) => {
-          if (active) setDocsVisible(Boolean(meta.accessible));
+          if (!active) return;
+          if (docsVersionRef.current !== null && docsVersionRef.current !== meta.version) {
+            invalidateDocsData();
+          }
+          docsVersionRef.current = meta.version;
+          setDocsVisible(Boolean(meta.accessible));
         })
         .catch(() => {
           if (active) setDocsVisible(false);
         });
     };
     sync();
-    const onFocus = () => sync();
+    const onFocus = () => sync(true);
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') sync();
+      if (document.visibilityState === 'visible') sync(true);
     };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibility);
@@ -49,6 +56,17 @@ export function PublicLayout() {
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
+
+  // Warm the lazy /docs chunk in the background once the link is visible.
+  useEffect(() => {
+    if (!docsVisible) return;
+    const timer = window.setTimeout(prefetchDocsData, 600);
+    return () => window.clearTimeout(timer);
+  }, [docsVisible]);
+
+  const warmDocs = () => {
+    prefetchDocsData();
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -85,7 +103,17 @@ export function PublicLayout() {
           <NavLink to="/tutor" style={linkStyle} className={linkClass}>{t('nav.tutor')}</NavLink>
           <NavLink to="/practice" style={linkStyle} className={linkClass}>{t('nav.practice')}</NavLink>
           <NavLink to="/books" style={linkStyle} className={linkClass}>{t('nav.books')}</NavLink>
-          {docsVisible && <NavLink to="/docs" style={linkStyle} className={linkClass}>{t('nav.docs')}</NavLink>}
+          {docsVisible && (
+            <NavLink
+              to="/docs"
+              style={linkStyle}
+              className={linkClass}
+              onPointerEnter={warmDocs}
+              onFocus={warmDocs}
+            >
+              {t('nav.docs')}
+            </NavLink>
+          )}
           <NavLink to="/about" style={linkStyle} className={linkClass}>{t('nav.about')}</NavLink>
           <NavLink to="/contact" style={linkStyle} className={linkClass}>{t('nav.contact')}</NavLink>
           {authed && user?.role === 'admin' && <NavLink to="/admin" style={linkStyle} className={linkClass}>{t('nav.dashboard')}</NavLink>}
@@ -136,7 +164,11 @@ export function PublicLayout() {
           <Link to="/tutor" className="nav-link" onClick={close}>{t('nav.tutor')}</Link>
           <Link to="/practice" className="nav-link" onClick={close}>{t('nav.practice')}</Link>
           <Link to="/books" className="nav-link" onClick={close}>{t('nav.books')}</Link>
-          {docsVisible && <Link to="/docs" className="nav-link" onClick={close}>{t('nav.docs')}</Link>}
+          {docsVisible && (
+            <Link to="/docs" className="nav-link" onClick={close} onPointerEnter={warmDocs} onFocus={warmDocs}>
+              {t('nav.docs')}
+            </Link>
+          )}
           <Link to="/about" className="nav-link" onClick={close}>{t('nav.about')}</Link>
           <Link to="/contact" className="nav-link" onClick={close}>{t('nav.contact')}</Link>
           <Link to="/help" className="nav-link" onClick={close}>{t('nav.help')}</Link>
@@ -185,7 +217,7 @@ export function PublicLayout() {
               <Link to="/tutor">{t('nav.tutor')}</Link>
               <Link to="/practice">{t('nav.practice')}</Link>
               <Link to="/books">{t('nav.books')}</Link>
-              {docsVisible && <Link to="/docs">{t('nav.docs')}</Link>}
+              {docsVisible && <Link to="/docs" onPointerEnter={warmDocs} onFocus={warmDocs}>{t('nav.docs')}</Link>}
             </div>
             <div>
               <h4>{t('footer.support')}</h4>
