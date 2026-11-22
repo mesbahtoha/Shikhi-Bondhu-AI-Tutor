@@ -879,6 +879,9 @@ It renders only a **published snapshot**; the editable draft stays private.
 - **Exports**: Markdown download and browser print-to-PDF, both generated from the currently
   published snapshot. API groups are expanded for printing.
 - **Sharing**: the public URL and current section anchor can be copied from the page.
+- **Navbar visibility**: the public Documentation link appears only while `/docs` is actually
+  accessible (published + enabled + inside its schedule). Taking documentation offline or
+  leaving it unpublished hides the link from desktop navigation, mobile navigation and footer.
 
 **Admin CMS (`/admin/docs`)**
 

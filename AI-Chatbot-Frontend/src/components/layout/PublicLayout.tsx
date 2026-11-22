@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ThemeLangControls } from '@/components/ui/ThemeLangControls';
 import { BrandLogo, BrandMark } from '@/components/brand/BrandLogo';
 import { useLang } from '@/lib/i18n';
+import { getDocsMeta } from '@/lib/docs';
 
 export function PublicLayout() {
   const user = useAuthStore((s) => s.user);
@@ -15,11 +16,39 @@ export function PublicLayout() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [docsVisible, setDocsVisible] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const { t, lang } = useLang();
   const authed = status === 'authenticated' && !!user;
   // Tutor is a focused study workspace: keep the top navbar, drop the footer.
   const hideFooter = location.pathname === '/tutor' || location.pathname.startsWith('/tutor/');
+
+  // The Documentation link is public only while the backend reports an
+  // accessible published snapshot (enabled + published + inside its window).
+  useEffect(() => {
+    let active = true;
+    const sync = () => {
+      getDocsMeta()
+        .then((meta) => {
+          if (active) setDocsVisible(Boolean(meta.accessible));
+        })
+        .catch(() => {
+          if (active) setDocsVisible(false);
+        });
+    };
+    sync();
+    const onFocus = () => sync();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') sync();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -56,7 +85,7 @@ export function PublicLayout() {
           <NavLink to="/tutor" style={linkStyle} className={linkClass}>{t('nav.tutor')}</NavLink>
           <NavLink to="/practice" style={linkStyle} className={linkClass}>{t('nav.practice')}</NavLink>
           <NavLink to="/books" style={linkStyle} className={linkClass}>{t('nav.books')}</NavLink>
-          <NavLink to="/docs" style={linkStyle} className={linkClass}>{t('nav.docs')}</NavLink>
+          {docsVisible && <NavLink to="/docs" style={linkStyle} className={linkClass}>{t('nav.docs')}</NavLink>}
           <NavLink to="/about" style={linkStyle} className={linkClass}>{t('nav.about')}</NavLink>
           <NavLink to="/contact" style={linkStyle} className={linkClass}>{t('nav.contact')}</NavLink>
           {authed && user?.role === 'admin' && <NavLink to="/admin" style={linkStyle} className={linkClass}>{t('nav.dashboard')}</NavLink>}
@@ -107,7 +136,7 @@ export function PublicLayout() {
           <Link to="/tutor" className="nav-link" onClick={close}>{t('nav.tutor')}</Link>
           <Link to="/practice" className="nav-link" onClick={close}>{t('nav.practice')}</Link>
           <Link to="/books" className="nav-link" onClick={close}>{t('nav.books')}</Link>
-          <Link to="/docs" className="nav-link" onClick={close}>{t('nav.docs')}</Link>
+          {docsVisible && <Link to="/docs" className="nav-link" onClick={close}>{t('nav.docs')}</Link>}
           <Link to="/about" className="nav-link" onClick={close}>{t('nav.about')}</Link>
           <Link to="/contact" className="nav-link" onClick={close}>{t('nav.contact')}</Link>
           <Link to="/help" className="nav-link" onClick={close}>{t('nav.help')}</Link>
@@ -156,7 +185,7 @@ export function PublicLayout() {
               <Link to="/tutor">{t('nav.tutor')}</Link>
               <Link to="/practice">{t('nav.practice')}</Link>
               <Link to="/books">{t('nav.books')}</Link>
-              <Link to="/docs">{t('nav.docs')}</Link>
+              {docsVisible && <Link to="/docs">{t('nav.docs')}</Link>}
             </div>
             <div>
               <h4>{t('footer.support')}</h4>
