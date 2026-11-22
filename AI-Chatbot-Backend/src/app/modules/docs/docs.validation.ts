@@ -8,7 +8,7 @@ const pitchBlockSchema = z.object({
   body: z.array(z.string().max(2000)).max(20),
 });
 
-const pitchBlockListSchema = z.array(pitchBlockSchema).max(30);
+const pitchBlockListSchema = z.array(pitchBlockSchema).max(60);
 
 const featureRowSchema = z.object({
   name: z.string().min(1).max(100),
@@ -48,9 +48,11 @@ export const saveDraftSchema = z.object({
   pitchDeck: pitchBlockListSchema.optional(),
   productOverview: pitchBlockListSchema.optional(),
   customSections: pitchBlockListSchema.optional(),
-  featureMatrix: z.array(featureRowSchema).max(30).optional(),
-  roadmap: z.array(roadmapEntrySchema).max(30).optional(),
-  changelog: z.array(changelogEntrySchema).max(20).optional(),
+  // The reviewed seed already contains more than 30 rows. Keep a generous
+  // cap so a legitimate feature inventory never blocks draft saves or publish.
+  featureMatrix: z.array(featureRowSchema).max(200).optional(),
+  roadmap: z.array(roadmapEntrySchema).max(100).optional(),
+  changelog: z.array(changelogEntrySchema).max(100).optional(),
 });
 
 const parseableDate = (value: string) => !Number.isNaN(Date.parse(value));

@@ -663,6 +663,9 @@ export interface DocsVersionEntry {
 export interface AdminDocs {
   doc: DocsDraft;
   publishedVersion: number;
+  draftVersion?: number;
+  publishedAt?: string | null;
+  publishedBy?: string;
   versions: DocsVersionEntry[];
   updatedBy: string;
   updatedAt: string;

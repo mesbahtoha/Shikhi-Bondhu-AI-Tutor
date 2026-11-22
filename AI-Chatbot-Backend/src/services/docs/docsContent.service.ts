@@ -569,6 +569,9 @@ export async function getDocsContentDoc(): Promise<DocumentationContentDoc> {
 export interface DocsAdminState {
   doc: DocumentationContentDoc;
   publishedVersion: number;
+  draftVersion: number;
+  publishedAt: string | null;
+  publishedBy: string;
   versions: Array<{ version: number; publishedBy: string; publishedAt: string }>;
   updatedBy: string;
   updatedAt: string;
@@ -583,6 +586,9 @@ export const docsContentService = {
     return {
       doc,
       publishedVersion: Number(doc.publishedVersion ?? 0),
+      draftVersion: Number(doc.draftVersion ?? 1),
+      publishedAt: doc.publishedAt ? new Date(doc.publishedAt as Date).toISOString() : null,
+      publishedBy: String(doc.publishedBy ?? ''),
       versions: versions.map((version) => ({
         version: Number(version.version),
         publishedBy: String(version.publishedBy ?? ''),
@@ -625,7 +631,17 @@ export const docsContentService = {
     });
     await DocumentationContentModel.updateOne(
       { _id: doc._id },
-      { $set: { publishedVersion: version, publishedAt: new Date(), publishedBy: adminUserEmail, updatedBy: adminUserEmail } }
+      {
+        $set: {
+          publishedVersion: version,
+          publishedAt: new Date(),
+          publishedBy: adminUserEmail,
+          updatedBy: adminUserEmail,
+          // Publishing a version is an explicit intent to make it live.
+          // A configured start/end window may still keep it scheduled.
+          'settings.enabled': true,
+        },
+      }
     );
     log.info('Documentation published', { version, admin: adminUserEmail });
     return this.getDraft();

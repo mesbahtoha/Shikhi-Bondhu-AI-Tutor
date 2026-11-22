@@ -68,6 +68,9 @@ function main() {
   check('saveDraftSchema rejects invalid feature status', !saveDraftSchema.safeParse({ featureMatrix: [{ name: 'x', description: 'y', status: 'bogus' }] }).success);
   check('saveDraftSchema accepts all roadmap categories', DOCS_ROADMAP_CATEGORIES.every((category) => saveDraftSchema.safeParse({ roadmap: [{ category, item: 'a', description: 'b' }] }).success));
   check('saveDraftSchema accepts all feature statuses', DOCS_FEATURE_STATUSES.every((status) => saveDraftSchema.safeParse({ featureMatrix: [{ name: 'x', description: 'y', status }] }).success));
+  check('saveDraftSchema accepts more than 30 feature rows', saveDraftSchema.safeParse({
+    featureMatrix: Array.from({ length: 31 }, (_, index) => ({ name: `Feature ${index}`, description: 'x', status: 'completed' as const })),
+  }).success);
   check('teamMemberSchema rejects empty name', !teamMemberSchema.safeParse({ name: '', role: 'Member', contact: '+123' }).success);
   check('teamMemberPatchSchema accepts partial update', teamMemberPatchSchema.safeParse({ name: 'New Name' }).success);
   check('restoreVersionSchema parses numeric version', restoreVersionSchema.safeParse({ version: '2' }).success);
@@ -113,6 +116,10 @@ function main() {
       check('seed draft version starts at >= 1', Number(seeded.draftVersion ?? 0) >= 1);
       check('seeded doc has custom sections array', Array.isArray(seeded.customSections));
       check('content migration is marked complete', Number(seeded.contentSeedVersion ?? 0) >= 3);
+      // Make the visibility assertions deterministic even when the local dev
+      // database was left offline by an earlier manual test.
+      await docsContentService.setPublishingEnabled(true);
+      await docsContentService.setSchedule({ start: null, end: null, timezone: 'Asia/Dhaka' });
       const allCopy = JSON.stringify({
         pitchDeck: seeded.pitchDeck,
         productOverview: seeded.productOverview,
@@ -149,8 +156,10 @@ function main() {
       const stateBefore = await docsContentService.getDraft();
       const versionsBefore = await docsContentService.listVersions();
       check('listVersions works', Array.isArray(versionsBefore));
+      await docsContentService.setPublishingEnabled(false);
       const publishResult = await docsContentService.publish('admin@docs-test.local');
       check('publish increments publishedVersion', publishResult.publishedVersion === (original ? Number(original.publishedVersion ?? 0) : 0) + 1);
+      check('publish enables public documentation', publishResult.doc.settings.enabled === true && (await docsContentService.getPublicMeta()).accessible === true);
       check('publish creates a version record', (await DocumentationVersionModel.countDocuments({})) > originalVersions);
       const versionsAfterPublish = await docsContentService.listVersions();
       check('listVersions includes new version', versionsAfterPublish.some((v) => v.version === publishResult.publishedVersion));

@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Form';
+import { Badge } from '@/components/ui/Badge';
+import { Input, Textarea } from '@/components/ui/Form';
 import { SkeletonBox } from '@/components/ui/Skeleton';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import '@/styles/docs.css';
 import {
   addDocTeamMember,
@@ -28,7 +30,69 @@ type AdminDocsSnapshot = AdminDocs;
 const TABS = ['Pitch deck', 'Product overview', 'Custom sections', 'Features', 'Team', 'Roadmap', 'Changelog', 'Versions', 'Publishing'] as const;
 type DocsTab = (typeof TABS)[number];
 
+function formatInstant(value: string | null | undefined, timeZone: string): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      timeZone,
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date);
+  } catch {
+    return date.toLocaleString();
+  }
+}
+
+function publicStatus(admin: AdminDocsSnapshot | null): {
+  label: string;
+  variant: 'success' | 'warning' | 'danger' | 'muted';
+  detail: string;
+} {
+  if (!admin) return { label: 'Loading', variant: 'muted', detail: 'Reading documentation state…' };
+  const settings = admin.doc.settings;
+  const timezone = settings?.timezone || 'Asia/Dhaka';
+  if (!settings?.enabled) {
+    return {
+      label: 'Offline',
+      variant: 'danger',
+      detail: 'Public /docs returns the unavailable state. Draft editing and version history remain available.',
+    };
+  }
+  if (!admin.publishedVersion) {
+    return {
+      label: 'Not published',
+      variant: 'warning',
+      detail: 'Public access is enabled, but no version has been published yet.',
+    };
+  }
+  const now = Date.now();
+  const start = settings.start ? Date.parse(settings.start) : null;
+  const end = settings.end ? Date.parse(settings.end) : null;
+  if (start && Number.isFinite(start) && now < start) {
+    return {
+      label: 'Scheduled',
+      variant: 'warning',
+      detail: `Public access starts ${formatInstant(settings.start, timezone)} (${timezone}).`,
+    };
+  }
+  if (end && Number.isFinite(end) && now > end) {
+    return {
+      label: 'Window ended',
+      variant: 'danger',
+      detail: `The public window ended ${formatInstant(settings.end, timezone)} (${timezone}). Update or clear the schedule to reopen.`,
+    };
+  }
+  return {
+    label: 'Live',
+    variant: 'success',
+    detail: `Public /docs is serving published version ${admin.publishedVersion}.`,
+  };
+}
+
 export function DocsAdminPage() {
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [admin, setAdmin] = useState<AdminDocsSnapshot | null>(null);
@@ -46,9 +110,30 @@ export function DocsAdminPage() {
   const [teamForm, setTeamForm] = useState({ name: '', role: 'Member', contact: '' });
   const [teamAvatarFile, setTeamAvatarFile] = useState<File | null>(null);
   const [teamUploading, setTeamUploading] = useState(false);
+  const savedEditorialRef = useRef('');
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const serializeEditorial = useCallback((blocks: {
+    pitchDeck: DocsBlock[];
+    productOverview: DocsBlock[];
+    customSections: DocsBlock[];
+    featureMatrix: DocsFeatureRow[];
+    roadmap: DocsRoadmapEntry[];
+    changelog: DocsChangelogEntry[];
+  }) => JSON.stringify(blocks), []);
+
+  const currentEditorial = useMemo(() => serializeEditorial({
+    pitchDeck,
+    productOverview,
+    customSections,
+    featureMatrix,
+    roadmap,
+    changelog,
+  }), [serializeEditorial, pitchDeck, productOverview, customSections, featureMatrix, roadmap, changelog]);
+
+  const dirty = Boolean(admin) && savedEditorialRef.current !== currentEditorial;
+
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [data, versionsData] = await Promise.all([getAdminDocs(), listAdminDocVersions()]);
@@ -62,44 +147,94 @@ export function DocsAdminPage() {
       setChangelog(draft.changelog ?? []);
       setVersions(versionsData.versions ?? []);
       setAdmin(data);
+      savedEditorialRef.current = serializeEditorial({
+        pitchDeck: draft.pitchDeck ?? [],
+        productOverview: draft.productOverview ?? [],
+        customSections: draft.customSections ?? [],
+        featureMatrix: draft.featureMatrix ?? [],
+        roadmap: draft.roadmap ?? [],
+        changelog: draft.changelog ?? [],
+      });
     } catch (err) {
       setError(getErrorMessage(err));
+      if (!silent) toast.error(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, []);
+  }, [serializeEditorial]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  const persistDraft = async (silent = false) => {
+  const persistDraft = async (silent = false): Promise<AdminDocsSnapshot | null> => {
     setSaving(true);
     try {
-      await saveAdminDocsDraft({ pitchDeck, productOverview, customSections, featureMatrix, roadmap, changelog });
+      const state = await saveAdminDocsDraft({
+        pitchDeck,
+        productOverview,
+        customSections,
+        featureMatrix,
+        roadmap,
+        changelog,
+      });
+      setAdmin(state);
+      savedEditorialRef.current = serializeEditorial({
+        pitchDeck: state.doc.pitchDeck ?? [],
+        productOverview: state.doc.productOverview ?? [],
+        customSections: state.doc.customSections ?? [],
+        featureMatrix: state.doc.featureMatrix ?? [],
+        roadmap: state.doc.roadmap ?? [],
+        changelog: state.doc.changelog ?? [],
+      });
       if (!silent) toast.success('Draft saved.');
-      return true;
+      return state;
     } catch (err) {
       toast.error(getErrorMessage(err));
-      return false;
+      return null;
     } finally {
       setSaving(false);
     }
   };
 
   const saveDraft = async () => {
-    if (await persistDraft()) await refresh();
+    await persistDraft();
   };
 
   const publish = async () => {
+    const confirmed = await confirm({
+      title: 'Publish documentation?',
+      message: 'Save the current editor state and publish it as a new public version. If a schedule is configured, the window still applies.',
+      confirmLabel: 'Publish now',
+    });
+    if (!confirmed) return;
+
     setPublishLoading(true);
     try {
       // Persist local editor state first; otherwise Publish would publish the
       // previously saved draft and silently discard the visible changes.
       const saved = await saveAdminDocsDraft({ pitchDeck, productOverview, customSections, featureMatrix, roadmap, changelog });
+      setAdmin(saved);
+      savedEditorialRef.current = serializeEditorial({
+        pitchDeck: saved.doc.pitchDeck ?? [],
+        productOverview: saved.doc.productOverview ?? [],
+        customSections: saved.doc.customSections ?? [],
+        featureMatrix: saved.doc.featureMatrix ?? [],
+        roadmap: saved.doc.roadmap ?? [],
+        changelog: saved.doc.changelog ?? [],
+      });
       const data = await publishAdminDocs();
-      toast.success(`Published version ${data.publishedVersion}. Draft v${saved.doc.draftVersion} is now live.`);
-      await refresh();
+      setAdmin(data);
+      savedEditorialRef.current = serializeEditorial({
+        pitchDeck: data.doc.pitchDeck ?? [],
+        productOverview: data.doc.productOverview ?? [],
+        customSections: data.doc.customSections ?? [],
+        featureMatrix: data.doc.featureMatrix ?? [],
+        roadmap: data.doc.roadmap ?? [],
+        changelog: data.doc.changelog ?? [],
+      });
+      toast.success(`Published version ${data.publishedVersion}. Public documentation is enabled.`);
+      await refresh(true);
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -108,17 +243,27 @@ export function DocsAdminPage() {
   };
 
   const previewDraft = async () => {
-    const saved = await persistDraft(true);
-    if (!saved) return;
+    if (dirty) {
+      const state = await persistDraft(true);
+      if (!state) return;
+    }
     window.open('/admin/docs/preview', '_blank', 'noopener');
   };
 
   const unpublish = async () => {
+    const confirmed = await confirm({
+      title: 'Take documentation offline?',
+      message: 'Public /docs will show the unavailable state immediately. The saved draft and published versions are kept, and administrators can still edit and republish.',
+      confirmLabel: 'Take offline',
+      danger: true,
+    });
+    if (!confirmed) return;
+
     setPublishLoading(true);
     try {
-      await unpublishAdminDocs();
-      toast.success('Documentation disabled. Public /docs now shows unavailable state.');
-      await refresh();
+      const state = await unpublishAdminDocs();
+      setAdmin(state);
+      toast.success('Public documentation is offline. Draft and version history are preserved.');
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -127,19 +272,34 @@ export function DocsAdminPage() {
   };
 
   const setEnabled = async (enabled: boolean) => {
+    if (!enabled) {
+      const confirmed = await confirm({
+        title: 'Disable public documentation?',
+        message: 'Visitors will immediately see an unavailable state. Draft editing remains available.',
+        confirmLabel: 'Disable public docs',
+        danger: true,
+      });
+      if (!confirmed) return;
+    }
     try {
-      await setAdminDocsEnabled(enabled);
-      toast.success(enabled ? 'Documentation enabled.' : 'Documentation disabled.');
-      await refresh();
+      const state = await setAdminDocsEnabled(enabled);
+      setAdmin(state);
+      toast.success(enabled ? 'Public documentation enabled.' : 'Public documentation disabled.');
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
   };
 
   const restoreVersion = async (version: number) => {
+    const confirmed = await confirm({
+      title: `Restore version ${version}?`,
+      message: 'This replaces the current draft with the selected published snapshot. The live website will not change until you publish again.',
+      confirmLabel: 'Restore to draft',
+    });
+    if (!confirmed) return;
+
     try {
       const { doc } = await restoreAdminDocVersion(version);
-      toast.success(`Restored version ${version} to draft.`);
       setPitchDeck(doc.pitchDeck ?? []);
       setProductOverview(doc.productOverview ?? []);
       setCustomSections(doc.customSections ?? []);
@@ -147,21 +307,52 @@ export function DocsAdminPage() {
       setRoadmap(doc.roadmap ?? []);
       setTeamMembers(doc.teamMembers ?? []);
       setChangelog(doc.changelog ?? []);
-      await refresh();
+      savedEditorialRef.current = serializeEditorial({
+        pitchDeck: doc.pitchDeck ?? [],
+        productOverview: doc.productOverview ?? [],
+        customSections: doc.customSections ?? [],
+        featureMatrix: doc.featureMatrix ?? [],
+        roadmap: doc.roadmap ?? [],
+        changelog: doc.changelog ?? [],
+      });
+      toast.success(`Restored version ${version} to the draft. Publish when ready.`);
+      await refresh(true);
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
   };
 
+  const discardChanges = async () => {
+    const confirmed = await confirm({
+      title: 'Discard unsaved changes?',
+      message: 'Your unsaved edits to the pitch deck, overview, custom sections, features, roadmap or changelog will be replaced by the saved draft.',
+      confirmLabel: 'Discard changes',
+      danger: true,
+    });
+    if (!confirmed) return;
+    await refresh(true);
+    toast('Unsaved changes discarded.', { icon: '↩️' });
+  };
+
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
   const addTeam = async () => {
-    if (!teamForm.name) {
-      toast.error('Team member name is required.');
+    if (!teamForm.name.trim() || !teamForm.role.trim() || !teamForm.contact.trim()) {
+      toast.error('Name, role and contact are required.');
       return;
     }
     const form = new FormData();
-    form.append('name', teamForm.name);
-    form.append('role', teamForm.role);
-    form.append('contact', teamForm.contact);
+    form.append('name', teamForm.name.trim());
+    form.append('role', teamForm.role.trim());
+    form.append('contact', teamForm.contact.trim());
     if (teamAvatarFile) form.append('avatar', teamAvatarFile);
     setTeamUploading(true);
     try {
@@ -211,11 +402,15 @@ export function DocsAdminPage() {
     }
   };
 
+  const status = publicStatus(admin);
+  const settings = admin?.doc?.settings;
+  const timezone = settings?.timezone || 'Asia/Dhaka';
+
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto', padding: 24 }}>
+    <div className="docs-cms" style={{ maxWidth: 1080, margin: '0 auto', padding: 24 }}>
       <header style={{ marginBottom: 16 }}>
         <h1>Documentation CMS</h1>
-        <p className="text-muted">Edit every documentation section, publish, schedule, manage the team and history.</p>
+        <p className="text-muted">Edit every documentation section, preview drafts, publish, schedule and manage Team Infyners.</p>
       </header>
 
       {error && (
@@ -235,15 +430,24 @@ export function DocsAdminPage() {
         <>
           <div className="docs-cms-toolbar">
             <div className="docs-cms-state">
-              Published: <strong>{admin.publishedVersion ? `v${admin.publishedVersion}` : 'Not published yet'}</strong> · Draft v{admin.doc?.draftVersion} ·
-              <span className="text-muted"> {admin.updatedBy ? `(by ${admin.updatedBy})` : ''}</span>
+              <div className="docs-cms-status-row">
+                <Badge variant={status.variant}>{status.label}</Badge>
+                {dirty && <Badge variant="warning">Unsaved changes</Badge>}
+              </div>
+              <div className="docs-cms-status-meta">
+                <span>Published: <strong>{admin.publishedVersion ? `v${admin.publishedVersion}` : 'not yet'}</strong></span>
+                <span>Draft: <strong>v{admin.draftVersion ?? admin.doc?.draftVersion ?? 1}</strong></span>
+                <span>Last published: {admin.publishedAt ? formatInstant(admin.publishedAt, timezone) : '—'}</span>
+              </div>
+              <p className="docs-cms-status-detail">{status.detail}</p>
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Button variant="secondary" onClick={() => void saveDraft()} loading={saving}>Save draft</Button>
+            <div className="docs-cms-actions">
+              <Button variant="secondary" onClick={() => void saveDraft()} loading={saving} disabled={!dirty}>Save draft</Button>
               <Button variant="secondary" onClick={() => void previewDraft()} loading={saving}>Preview draft</Button>
-              <Button onClick={() => void publish()} loading={publishLoading}>Publish</Button>
-              <Button variant="secondary" onClick={() => void unpublish()} loading={publishLoading}>Unpublish (disable)</Button>
+              <Button onClick={() => void publish()} loading={publishLoading}>Publish changes</Button>
+              <Button variant="danger" onClick={() => void unpublish()} loading={publishLoading}>Take offline</Button>
               <Button variant="secondary" onClick={() => window.open('/docs', '_blank', 'noopener')}>Open public page</Button>
+              <Button variant="ghost" onClick={() => void discardChanges()} disabled={!dirty}>Discard changes</Button>
             </div>
           </div>
 
@@ -293,48 +497,75 @@ export function DocsAdminPage() {
           {activeTab === 'Versions' && (
             <div className="pg-card" style={{ padding: 16 }}>
               <h3>Version history</h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 10 }}>
-                <thead>
-                  <tr><th style={{ textAlign: 'left', padding: 6 }}>Version</th><th style={{ textAlign: 'left', padding: 6 }}>Published by</th><th style={{ textAlign: 'left', padding: 6 }}>Published at</th><th style={{ textAlign: 'left', padding: 6, width: 80 }}>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {versions.length === 0 ? (
-                    <tr><td colSpan={4} style={{ padding: 8, color: 'var(--text-secondary)' }}>No published versions yet.</td></tr>
-                  ) : versions.map((version) => (
-                    <tr key={version.version} style={{ borderTop: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: 6 }}>v{version.version}</td>
-                      <td style={{ padding: 6 }}>{version.publishedBy || '—'}</td>
-                      <td style={{ padding: 6 }}>{new Date(version.publishedAt).toLocaleString()}</td>
-                      <td style={{ padding: 6 }}>
-                        <Button size="sm" variant="secondary" onClick={() => void restoreVersion(version.version)}>Restore</Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="docs-table-scroll">
+                <table style={{ width: '100%', minWidth: 620, borderCollapse: 'collapse', marginTop: 10 }}>
+                  <thead>
+                    <tr><th style={{ textAlign: 'left', padding: 6 }}>Version</th><th style={{ textAlign: 'left', padding: 6 }}>Published by</th><th style={{ textAlign: 'left', padding: 6 }}>Published at</th><th style={{ textAlign: 'left', padding: 6, width: 90 }}>Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {versions.length === 0 ? (
+                      <tr><td colSpan={4} style={{ padding: 8, color: 'var(--text-secondary)' }}>No published versions yet.</td></tr>
+                    ) : versions.map((version) => (
+                      <tr key={version.version} style={{ borderTop: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: 6 }}>v{version.version}</td>
+                        <td style={{ padding: 6 }}>{version.publishedBy || '—'}</td>
+                        <td style={{ padding: 6 }}>{formatInstant(version.publishedAt, timezone)}</td>
+                        <td style={{ padding: 6 }}>
+                          <Button size="sm" variant="secondary" onClick={() => void restoreVersion(version.version)}>Restore</Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
           {activeTab === 'Publishing' && (
             <div className="pg-card" style={{ padding: 16 }}>
-              <h3>Publishing settings</h3>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-                <Button variant="secondary" onClick={() => void setEnabled(true)}>Enable public docs</Button>
-                <Button variant="danger" onClick={() => void setEnabled(false)}>Disable public docs</Button>
-                <span className="text-muted">Status: {admin.doc?.settings?.enabled ? 'enabled' : 'disabled'}</span>
+              <div className="flex items-center justify-between" style={{ gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>Publishing controls</h3>
+                  <p className="text-muted" style={{ margin: '4px 0 0', fontSize: 13.5 }}>
+                    Public access: <Badge variant={status.variant}>{status.label}</Badge>
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {settings?.enabled ? (
+                    <Button variant="danger" onClick={() => void setEnabled(false)}>Take public docs offline</Button>
+                  ) : (
+                    <Button onClick={() => void setEnabled(true)}>Enable public docs</Button>
+                  )}
+                  <Button variant="secondary" onClick={() => window.open('/docs', '_blank', 'noopener')}>Open public page</Button>
+                </div>
               </div>
-              <ScheduleEditor settings={admin.doc?.settings ?? { enabled: true, start: null, end: null, timezone: 'Asia/Dhaka' }} onSave={async (schedule) => {
-                try {
-                  await setAdminDocsSchedule({
-                    start: schedule.start,
-                    end: schedule.end,
-                    timezone: schedule.timezone,
-                  });
-                  toast.success('Schedule saved.');
-                  await refresh();
-                } catch (err) {
-                  toast.error(getErrorMessage(err));
-                }
-              }} />
+              <p className="text-muted" style={{ fontSize: 13, margin: '10px 0 16px' }}>
+                {status.detail}
+              </p>
+              <ScheduleEditor
+                settings={settings ?? { enabled: true, start: null, end: null, timezone: 'Asia/Dhaka' }}
+                onSave={async (schedule) => {
+                  try {
+                    const state = await setAdminDocsSchedule({
+                      start: schedule.start,
+                      end: schedule.end,
+                      timezone: schedule.timezone,
+                    });
+                    setAdmin(state);
+                    toast.success('Schedule saved. The server enforces this window immediately.');
+                  } catch (err) {
+                    toast.error(getErrorMessage(err));
+                  }
+                }}
+                onClear={async () => {
+                  try {
+                    const state = await setAdminDocsSchedule({ start: null, end: null, timezone });
+                    setAdmin(state);
+                    toast.success('Schedule cleared. Documentation is available whenever public access is on.');
+                  } catch (err) {
+                    toast.error(getErrorMessage(err));
+                  }
+                }}
+              />
             </div>
           )}
         </>
@@ -377,12 +608,13 @@ function BlockList({ title, blocks, onBlocks }: BlockListProps) {
               <Button variant="danger" onClick={() => onBlocks(blocks.filter((_, i) => i !== blockIndex))}>Remove block</Button>
             </div>
             {block.body.map((line, lineIndex) => (
-              <Input
+              <Textarea
                 key={`${blockIndex}-${lineIndex}`}
                 value={line}
+                rows={2}
                 placeholder={`Paragraph ${lineIndex + 1}`}
                 onChange={(e) => updateParagraph(blockIndex, lineIndex, e.target.value)}
-                style={{ marginBottom: 4 }}
+                style={{ marginBottom: 6, minHeight: 64, resize: 'vertical' }}
               />
             ))}
             <Button variant="secondary" size="sm" onClick={() => updateBlock(blockIndex, { body: [...block.body, ''] })}>Add paragraph</Button>
@@ -404,28 +636,30 @@ function FeatureEditor({ features, onFeatures }: FeatureEditorProps) {
         <h3 style={{ margin: 0 }}>Feature matrix</h3>
         <Button variant="secondary" onClick={() => onFeatures([...features, { name: 'New feature', description: '', status: 'planned' }])}>Add feature</Button>
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
-        <thead>
-          <tr><th style={{ textAlign: 'left', padding: 6 }}>Name</th><th style={{ textAlign: 'left', padding: 6 }}>Status</th><th style={{ textAlign: 'left', padding: 6 }}>Description</th><th style={{ textAlign: 'left', padding: 6 }}>Route</th><th style={{ textAlign: 'left', padding: 6, width: 100 }}>Actions</th></tr>
-        </thead>
-        <tbody>
-          {features.map((row, index) => (
-            <tr key={`${row.name}-${index}`} style={{ borderTop: '1px solid var(--border-color)' }}>
-              <td style={{ padding: 6 }}><Input value={row.name} onChange={(e) => update(index, { name: e.target.value })} /></td>
-              <td style={{ padding: 6 }}>
-                <select value={row.status} onChange={(e) => update(index, { status: e.target.value as DocsFeatureRow['status'] })} className="select" aria-label={`Status of ${row.name}`}>
-                  <option value="completed">completed</option>
-                  <option value="in_progress">in_progress</option>
-                  <option value="planned">planned</option>
-                </select>
-              </td>
-              <td style={{ padding: 6 }}><Input value={row.description} placeholder="Description" onChange={(e) => update(index, { description: e.target.value })} /></td>
-              <td style={{ padding: 6, width: 130 }}><Input value={row.route ?? ''} placeholder="/route" onChange={(e) => update(index, { route: e.target.value || undefined })} /></td>
-              <td style={{ padding: 6, width: 90 }}><Button size="sm" variant="danger" onClick={() => onFeatures(features.filter((_, i) => i !== index))}>Remove</Button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="docs-table-scroll">
+        <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse', marginTop: 12 }}>
+          <thead>
+            <tr><th style={{ textAlign: 'left', padding: 6 }}>Name</th><th style={{ textAlign: 'left', padding: 6 }}>Status</th><th style={{ textAlign: 'left', padding: 6 }}>Description</th><th style={{ textAlign: 'left', padding: 6 }}>Route</th><th style={{ textAlign: 'left', padding: 6, width: 100 }}>Actions</th></tr>
+          </thead>
+          <tbody>
+            {features.map((row, index) => (
+              <tr key={`${row.name}-${index}`} style={{ borderTop: '1px solid var(--border-color)' }}>
+                <td style={{ padding: 6 }}><Input value={row.name} onChange={(e) => update(index, { name: e.target.value })} /></td>
+                <td style={{ padding: 6 }}>
+                  <select value={row.status} onChange={(e) => update(index, { status: e.target.value as DocsFeatureRow['status'] })} className="select" aria-label={`Status of ${row.name}`}>
+                    <option value="completed">completed</option>
+                    <option value="in_progress">in_progress</option>
+                    <option value="planned">planned</option>
+                  </select>
+                </td>
+                <td style={{ padding: 6 }}><Textarea value={row.description} rows={2} placeholder="Description" onChange={(e) => update(index, { description: e.target.value })} style={{ minWidth: 220, minHeight: 58 }} /></td>
+                <td style={{ padding: 6, width: 130 }}><Input value={row.route ?? ''} placeholder="/route" onChange={(e) => update(index, { route: e.target.value || undefined })} /></td>
+                <td style={{ padding: 6, width: 90 }}><Button size="sm" variant="danger" onClick={() => onFeatures(features.filter((_, i) => i !== index))}>Remove</Button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -574,27 +808,29 @@ function RoadmapEditor({ entries, onEntries }: RoadmapEditorProps) {
         <h3 style={{ margin: 0 }}>Roadmap</h3>
         <Button variant="secondary" onClick={() => onEntries([...entries, { category: 'shortTerm', item: 'New roadmap item', description: '' }])}>Add entry</Button>
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
-        <thead>
-          <tr><th style={{ textAlign: 'left', padding: 6 }}>Category</th><th style={{ textAlign: 'left', padding: 6 }}>Item</th><th style={{ textAlign: 'left', padding: 6 }}>Description</th><th style={{ textAlign: 'left', padding: 6, width: 80 }}>Actions</th></tr>
-        </thead>
-        <tbody>
-          {entries.map((entry, index) => (
-            <tr key={`${entry.category}-${index}`} style={{ borderTop: '1px solid var(--border-color)' }}>
-              <td style={{ padding: 6 }}>
-                <select value={entry.category} onChange={(e) => update(index, { category: e.target.value as DocsRoadmapEntry['category'] })} className="select" aria-label={`Category of ${entry.item}`}>
-                  <option value="shortTerm">shortTerm</option>
-                  <option value="midTerm">midTerm</option>
-                  <option value="longTerm">longTerm</option>
-                </select>
-              </td>
-              <td style={{ padding: 6 }}><Input value={entry.item} onChange={(e) => update(index, { item: e.target.value })} /></td>
-              <td style={{ padding: 6 }}><Input value={entry.description} onChange={(e) => update(index, { description: e.target.value })} /></td>
-              <td style={{ padding: 6, width: 90 }}><Button size="sm" variant="danger" onClick={() => onEntries(entries.filter((_, i) => i !== index))}>Remove</Button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="docs-table-scroll">
+        <table style={{ width: '100%', minWidth: 680, borderCollapse: 'collapse', marginTop: 12 }}>
+          <thead>
+            <tr><th style={{ textAlign: 'left', padding: 6 }}>Category</th><th style={{ textAlign: 'left', padding: 6 }}>Item</th><th style={{ textAlign: 'left', padding: 6 }}>Description</th><th style={{ textAlign: 'left', padding: 6, width: 80 }}>Actions</th></tr>
+          </thead>
+          <tbody>
+            {entries.map((entry, index) => (
+              <tr key={`${entry.category}-${index}`} style={{ borderTop: '1px solid var(--border-color)' }}>
+                <td style={{ padding: 6 }}>
+                  <select value={entry.category} onChange={(e) => update(index, { category: e.target.value as DocsRoadmapEntry['category'] })} className="select" aria-label={`Category of ${entry.item}`}>
+                    <option value="shortTerm">shortTerm</option>
+                    <option value="midTerm">midTerm</option>
+                    <option value="longTerm">longTerm</option>
+                  </select>
+                </td>
+                <td style={{ padding: 6 }}><Input value={entry.item} onChange={(e) => update(index, { item: e.target.value })} /></td>
+                <td style={{ padding: 6 }}><Textarea value={entry.description} rows={2} onChange={(e) => update(index, { description: e.target.value })} style={{ minWidth: 220, minHeight: 58 }} /></td>
+                <td style={{ padding: 6, width: 90 }}><Button size="sm" variant="danger" onClick={() => onEntries(entries.filter((_, i) => i !== index))}>Remove</Button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -621,12 +857,13 @@ function ChangelogEditor({ entries, onEntries }: ChangelogEditorProps) {
               <Button variant="danger" onClick={() => onEntries(entries.filter((_, i) => i !== index))}>Remove</Button>
             </div>
             {entry.items.map((item, itemIndex) => (
-              <Input
+              <Textarea
                 key={itemIndex}
                 value={item}
+                rows={2}
                 placeholder={`Change ${itemIndex + 1}`}
                 onChange={(e) => updateEntry(index, { items: entry.items.map((current, i) => (i === itemIndex ? e.target.value : current)) })}
-                style={{ marginTop: 4 }}
+                style={{ marginTop: 6, minHeight: 58, resize: 'vertical' }}
               />
             ))}
             <Button variant="secondary" size="sm" style={{ marginTop: 4 }} onClick={() => updateEntry(index, { items: [...entry.items, ''] })}>Add change</Button>
@@ -641,9 +878,10 @@ function ChangelogEditor({ entries, onEntries }: ChangelogEditorProps) {
 interface ScheduleEditorProps {
   settings: { start: string | null; end: string | null; timezone: string };
   onSave: (schedule: { start: string | null; end: string | null; timezone: string }) => void;
+  onClear?: () => void;
 }
 
-function ScheduleEditor({ settings, onSave }: ScheduleEditorProps) {
+function ScheduleEditor({ settings, onSave, onClear }: ScheduleEditorProps) {
   const timezone = settings.timezone || 'Asia/Dhaka';
   const [form, setForm] = useState({
     start: utcIsoToLocalInput(settings.start, timezone),
@@ -705,6 +943,9 @@ function ScheduleEditor({ settings, onSave }: ScheduleEditorProps) {
         >
           Save schedule
         </Button>
+        {onClear && (
+          <Button variant="ghost" onClick={onClear}>Clear schedule</Button>
+        )}
       </div>
       <span className="text-muted" style={{ fontSize: 12.5 }}>
         Empty start/end means always accessible while documentation is enabled. Both values are interpreted in the selected IANA timezone.

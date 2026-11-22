@@ -886,6 +886,12 @@ It renders only a **published snapshot**; the editable draft stays private.
   matrix and routes, roadmap, changelog and Team Infyners.
 - Save drafts, preview the exact draft at `/admin/docs/preview`, publish a version, or
   disable public access.
+- See a live status panel (Live / Scheduled / Offline / Not published), published and draft
+  version numbers, last publish time, and an unsaved-changes indicator.
+- Publish, take-offline and version-restore actions require confirmation. Publishing saves
+  the visible editor state first and enables public access; a configured schedule still applies.
+- Long editorial paragraphs, feature descriptions, roadmap descriptions and changelog entries
+  use multi-line editors. The feature-matrix API accepts up to 200 rows.
 - Upload/replace team profile images; the three confirmed members are protected from deletion.
 - Configure an ON/OFF switch and an optional start/end window. The selected IANA timezone is
   used to convert the admin's wall-clock input to UTC, and the backend re-checks the window
@@ -939,7 +945,7 @@ npm run build            # type-check + Vite production build
 - Quiz schema validation
 
 Expected results: `test:tutor` → `72 passed, 0 failed`; `test:practice` →
-`20 passed, 0 failed`; `test:docs` → `57 passed, 0 failed` with MongoDB reachable
+`20 passed, 0 failed`; `test:docs` → `59 passed, 0 failed` with MongoDB reachable
 (the DB block is skipped when `MONGO_URI` is unset).
 
 The documentation module was also verified in a real browser with Playwright:
