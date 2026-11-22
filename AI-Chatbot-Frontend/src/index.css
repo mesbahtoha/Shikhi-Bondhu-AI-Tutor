@@ -2213,7 +2213,9 @@ body.drawer-open {
   font-family: var(--pg-font-body);
   font-size: 16px;
   line-height: 1.55;
-  overflow-x: hidden;
+  /* `clip` prevents horizontal overflow without turning .pg-app into a
+     non-scrolling ancestor that breaks position: sticky (navbar/sidebar). */
+  overflow-x: clip;
 }
 
 .pg-app h1,

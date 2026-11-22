@@ -874,8 +874,9 @@ It renders only a **published snapshot**; the editable draft stays private.
   practice/exam attempts, published practice sets, AI usage records, and users with an
   unexpired refresh session. Each metric can independently report `unavailable`; unavailable
   is visually distinct from zero.
-- **Search and navigation**: sticky desktop sidebar, mobile section picker, anchor links,
-  active-section tracking and full-text section filtering.
+- **Search and navigation**: a sticky desktop sidebar and sticky mobile section bar (the bar
+  pins below the site header while scrolling), anchor links, active-section tracking and
+  full-text section filtering.
 - **Exports**: Markdown download and browser print-to-PDF, both generated from the currently
   published snapshot. API groups are expanded for printing.
 - **Sharing**: the public URL and current section anchor can be copied from the page.

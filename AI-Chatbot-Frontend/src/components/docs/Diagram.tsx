@@ -7,13 +7,32 @@ const FILL = 'var(--text-primary)';
 const BG = 'var(--bg-surface)';
 const BORDER = 'var(--border-color)';
 
-function Box({ x, y, width, height, title, subtitle, accent }: { x: number; y: number; width: number; height: number; title: string; subtitle?: string; accent?: boolean }) {
+function Box({
+  x,
+  y,
+  width,
+  height,
+  title,
+  subtitle,
+  note,
+  accent,
+}: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  title: string;
+  subtitle?: string;
+  note?: string;
+  accent?: boolean;
+}) {
   return (
     <g>
       <rect x={x} y={y} width={width} height={height} rx={12} fill={BG} stroke={accent ? 'var(--color-primary)' : BORDER} strokeWidth={accent ? 2 : 1} />
       <rect x={x} y={y} width={width} height={24} rx={10} fill="transparent" />
       <text x={x + 16} y={y + 17} fontFamily="Outfit, system-ui, sans-serif" fontSize={13} fontWeight={800} fill={accent ? 'var(--text-primary)' : FILL}>{title}</text>
       {subtitle && <text x={x + 16} y={y + 44} fontFamily="Outfit, system-ui, sans-serif" fontSize={12} fill={STROKE}>{subtitle}</text>}
+      {note && <text x={x + 16} y={y + 66} fontFamily="Outfit, system-ui, sans-serif" fontSize={10.5} fill={STROKE}>{note}</text>}
     </g>
   );
 }
@@ -69,7 +88,7 @@ export function ArchitectureDiagram() {
 
       <Box x={750} y={170} width={310} height={112} title="MongoDB + Mongoose" subtitle="Books · chunks · chats · practice · docs" />
       <Box x={750} y={320} width={310} height={100} title="GridFS uploads bucket" subtitle="Textbook PDFs · notice files · avatars" />
-      <Box x={750} y={454} width={310} height={94} title="AI provider router" subtitle="OpenRouter · Anthropic · Gemini · compatible · mock" />
+      <Box x={750} y={454} width={310} height={94} title="AI provider router" subtitle="OpenRouter · Anthropic · Gemini · compatible · mock" note="Fallback only before the first streamed token" />
 
       <Arrow x1={320} y1={76} x2={370} y2={76} />
       <Arrow x1={700} y1={76} x2={750} y2={76} />
@@ -89,7 +108,6 @@ export function ArchitectureDiagram() {
       <Label x={725} y={156} text="service calls" />
       <Label x={117} y={300} text="retrieval inputs" />
       <Label x={1040} y={300} text="persistence" />
-      <Label x={710} y={540} text="provider fallback only before the first streamed token" />
     </svg>
   );
 }

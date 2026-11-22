@@ -11,6 +11,7 @@
   padding: 0 20px 64px;
   display: grid;
   grid-template-columns: 1fr;
+  align-items: start;
 }
 
 .docs-sidebar {
@@ -19,16 +20,19 @@
 
 @media (min-width: 1100px) {
   .docs-layout {
-    grid-template-columns: 260px 1fr;
+    grid-template-columns: 260px minmax(0, 1fr);
     gap: 32px;
   }
   .docs-sidebar {
     display: block;
     position: sticky;
-    top: 80px;
-    height: calc(100vh - 120px);
+    top: 84px;
+    align-self: start;
+    max-height: calc(100dvh - 104px);
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding-right: 8px;
+    scrollbar-width: thin;
   }
 }
 
@@ -190,8 +194,15 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  margin: 12px 0 4px;
+  position: sticky;
+  top: 68px;
+  z-index: 45;
+  margin: 0 -20px 10px;
+  padding: 8px 20px;
   flex-wrap: wrap;
+  background: var(--pg-bg);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
 }
 
 .docs-mobile-nav select {
@@ -965,6 +976,12 @@
 
 .docs-cms .textarea, .docs-cms .input {
   width: 100%;
+}
+
+@media (max-width: 600px) {
+  .docs-mobile-nav {
+    top: 60px;
+  }
 }
 
 @media (max-width: 700px) {
