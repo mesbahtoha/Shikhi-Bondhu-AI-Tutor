@@ -1,4 +1,4 @@
-# Shikhi Bondhu - Class 3 AI Tutor
+# Shikhi Bondhu - AI Tutor
 
 A Bengali-first, textbook-grounded AI study companion for Class 3 learners in Bangladesh.
 Children can ask in **Bengali, English, or Banglish**; the tutor answers in simple Bengali
