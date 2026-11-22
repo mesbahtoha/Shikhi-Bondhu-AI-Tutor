@@ -28,6 +28,7 @@ const PracticePage = lazyRoute(() => import('@/pages/PracticePage').then((m) => 
 const PracticeAttemptPage = lazyRoute(() => import('@/pages/PracticeAttemptPage').then((m) => ({ default: m.PracticeAttemptPage })), 'practice-attempt');
 const DocsPage = lazyRoute(() => import('@/pages/DocsPage').then((m) => ({ default: m.DocsPage })), 'docs');
 const DocsAdminPage = lazyRoute(() => import('@/pages/admin/Docs').then((m) => ({ default: m.DocsAdminPage })), 'admin-docs');
+const DocsPreviewPage = lazyRoute(() => import('@/pages/admin/DocsPreview').then((m) => ({ default: m.DocsPreviewPage })), 'admin-docs-preview');
 const AboutPage = lazyRoute(() => import('@/pages/AboutPage').then((m) => ({ default: m.AboutPage })), 'about');
 const ContactPage = lazyRoute(() => import('@/pages/ContactPage').then((m) => ({ default: m.ContactPage })), 'contact');
 const HelpPage = lazyRoute(() => import('@/pages/HelpPage').then((m) => ({ default: m.HelpPage })), 'help');
@@ -137,6 +138,7 @@ export default function App() {
             <Route path="/admin/books" element={<AdminBooks />} />
             <Route path="/admin/practice" element={<AdminPractice />} />
             <Route path="/admin/docs" element={<DocsAdminPage />} />
+            <Route path="/admin/docs/preview" element={<DocsPreviewPage />} />
             <Route path="/admin/ai-settings" element={<AdminAISettings />} />
             <Route path="/admin/notices" element={<AdminNotices />} />
             <Route path="/admin/chats" element={<AdminChats />} />

@@ -1,4 +1,4 @@
-import { api, apiGet, apiPost, apiPut, API_BASE_URL } from './api';
+import { api, apiGet, apiPost, apiPut, apiUpload, API_BASE_URL } from './api';
 export { getErrorMessage } from './api';
 import type { DocsContent, DocsDraft, DocsMeta, PublicDocStats, AdminDocs, DocsTeamMember, DocsVersionEntry } from '@/types';
 
@@ -18,8 +18,9 @@ export async function getDocsStats(): Promise<PublicDocStats> {
   return stats;
 }
 
-export function getTeamAvatarUrl(memberId: string): string {
-  return `${API_BASE_URL}/api/v1/docs/media/${encodeURIComponent(memberId)}`;
+export function getTeamAvatarUrl(memberId: string, version?: string): string {
+  const suffix = version ? `?v=${encodeURIComponent(version)}` : '';
+  return `${API_BASE_URL}/api/v1/docs/media/${encodeURIComponent(memberId)}${suffix}`;
 }
 
 /** Docs admin API helpers (admin only). */
@@ -64,6 +65,21 @@ export async function addDocTeamMember(payload: FormData) {
 export async function updateDocTeamMember(memberId: string, patch: { name?: string; role?: string; contact?: string; avatarId?: string }) {
   const { data } = await api.patch<{ member: DocsTeamMember | null }>(`/api/v1/admin/docs/team/${memberId}`, patch);
   return data;
+}
+
+/** Admin-only preview of the draft avatar. Returns an object URL to revoke. */
+export async function getAdminTeamAvatarUrl(memberId: string): Promise<string> {
+  const response = await api.get(`/api/v1/admin/docs/team/${memberId}/avatar`, { responseType: 'blob' });
+  return URL.createObjectURL(response.data as Blob);
+}
+
+export async function updateDocTeamMemberAvatar(memberId: string, file: File) {
+  const form = new FormData();
+  form.append('avatar', file);
+  return apiUpload<{ member: DocsTeamMember | null; avatarId: string }>(
+    `/api/v1/admin/docs/team/${memberId}/avatar`,
+    form
+  );
 }
 
 export async function deleteDocTeamMember(memberId: string) {

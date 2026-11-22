@@ -13,19 +13,23 @@ import {
 
 const router = Router();
 
-// Draft + publish + schedule + versions
-router.get('/docs', docsAdminController.get);
-router.put('/docs', validate(saveDraftSchema, 'body'), docsAdminController.saveDraft);
-router.post('/docs/publish', docsAdminController.publish);
-router.post('/docs/unpublish', docsAdminController.unpublish);
-router.put('/docs/schedule', validate(scheduleSchema, 'body'), docsAdminController.setSchedule);
-router.get('/docs/versions', docsAdminController.listVersions);
-router.post('/docs/versions/:version/restore', validate(restoreVersionSchema, 'params'), docsAdminController.restoreVersion);
-router.put('/docs/enabled', validate(enabledSchema, 'body'), docsAdminController.setPublishingEnabled);
+// Mounted at /api/v1/admin/docs by the parent admin router.
+router.get('/', docsAdminController.get);
+router.put('/', validate(saveDraftSchema, 'body'), docsAdminController.saveDraft);
+router.post('/publish', docsAdminController.publish);
+router.post('/unpublish', docsAdminController.unpublish);
+router.put('/schedule', validate(scheduleSchema, 'body'), docsAdminController.setSchedule);
+router.get('/versions', docsAdminController.listVersions);
+router.post('/versions/:version/restore', validate(restoreVersionSchema, 'params'), docsAdminController.restoreVersion);
+router.put('/enabled', validate(enabledSchema, 'body'), docsAdminController.setPublishingEnabled);
 
 // Team management (confirmed members cannot be removed)
-router.post('/docs/team', validate(teamMemberSchema, 'body'), uploadAvatar.single('avatar'), docsAdminController.addTeamMember);
-router.patch('/docs/team/:memberId', validate(teamMemberPatchSchema, 'body'), docsAdminController.updateTeamMember);
-router.delete('/docs/team/:memberId', docsAdminController.deleteTeamMember);
+// Multipart parsing must run before body validation: multer populates
+// req.body from the form fields.
+router.post('/team', uploadAvatar.single('avatar'), validate(teamMemberSchema, 'body'), docsAdminController.addTeamMember);
+router.patch('/team/:memberId', validate(teamMemberPatchSchema, 'body'), docsAdminController.updateTeamMember);
+router.get('/team/:memberId/avatar', docsAdminController.getTeamAvatar);
+router.post('/team/:memberId/avatar', uploadAvatar.single('avatar'), docsAdminController.updateTeamAvatar);
+router.delete('/team/:memberId', docsAdminController.deleteTeamMember);
 
 export default router;

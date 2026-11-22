@@ -1,6 +1,6 @@
 import { asyncHandler, ok } from '../../../utils/response.utils';
 import docsContentService from '../../../services/docs/docsContent.service';
-import { uploadBuffer } from '../../../config/gridfs';
+import { findFile, streamFile, uploadBuffer } from '../../../config/gridfs';
 
 /** Admin docs controller: draft/publish/schedule/versions/team/features. */
 export const docsAdminController = {
@@ -14,6 +14,7 @@ export const docsAdminController = {
     const state = await docsContentService.saveDraft({
       pitchDeck: req.body.pitchDeck,
       productOverview: req.body.productOverview,
+      customSections: req.body.customSections,
       featureMatrix: req.body.featureMatrix,
       roadmap: req.body.roadmap,
       changelog: req.body.changelog,
@@ -61,7 +62,10 @@ export const docsAdminController = {
     if (req.file) {
       avatarId = String(await uploadBuffer(req.file.buffer, req.file.originalname, req.file.mimetype, { kind: 'team-avatar', memberName: String(req.body.name ?? '') }));
     }
-    const state = await docsContentService.addTeamMember({ name: String(req.body.name ?? ''), role: String(req.body.role ?? ''), contact: String(req.body.contact ?? ''), avatarId });
+    const state = await docsContentService.addTeamMember(
+      { name: String(req.body.name ?? ''), role: String(req.body.role ?? ''), contact: String(req.body.contact ?? ''), avatarId },
+      req.user?.email ?? ''
+    );
     return ok(res, {
       member: state.member,
       versions: state.versions,
@@ -71,17 +75,38 @@ export const docsAdminController = {
   }),
 
   updateTeamMember: asyncHandler(async (req, res) => {
-    const result = await docsContentService.updateTeamMember(String(req.params.memberId), {
-      name: String(req.body.name ?? ''),
-      role: String(req.body.role ?? ''),
-      contact: String(req.body.contact ?? ''),
-      avatarId: req.body.avatarId ? String(req.body.avatarId) : undefined,
-    });
+    const patch: { name?: string; role?: string; contact?: string; avatarId?: string } = {};
+    for (const field of ['name', 'role', 'contact', 'avatarId'] as const) {
+      if (typeof req.body[field] === 'string') patch[field] = req.body[field];
+    }
+    const result = await docsContentService.updateTeamMember(String(req.params.memberId), patch, req.user?.email ?? '');
+    return ok(res, result);
+  }),
+
+  getTeamAvatar: asyncHandler(async (req, res) => {
+    const state = await docsContentService.getDraft();
+    const member = (state.doc.teamMembers ?? []).find((candidate) => candidate.id === String(req.params.memberId));
+    if (!member?.avatarId) return res.status(404).json({ success: false, message: 'Avatar not found' });
+    const file = await findFile(member.avatarId);
+    if (!file) return res.status(404).json({ success: false, message: 'Avatar file is missing' });
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Type', file.contentType || 'image/jpeg');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    await streamFile(res, member.avatarId);
+  }),
+
+  updateTeamAvatar: asyncHandler(async (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, message: 'An image file is required.' });
+    const result = await docsContentService.updateTeamMemberAvatar(
+      String(req.params.memberId),
+      { buffer: req.file.buffer, originalname: req.file.originalname, mimetype: req.file.mimetype },
+      req.user?.email ?? ''
+    );
     return ok(res, result);
   }),
 
   deleteTeamMember: asyncHandler(async (req, res) => {
-    const { deleted, remaining } = await docsContentService.deleteTeamMember(String(req.params.memberId));
+    const { deleted, remaining } = await docsContentService.deleteTeamMember(String(req.params.memberId), req.user?.email ?? '');
     return ok(res, { deleted, remaining });
   }),
 };

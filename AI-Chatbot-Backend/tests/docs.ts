@@ -64,6 +64,7 @@ function main() {
   check('scheduleSchema rejects start after end', !scheduleSchema.safeParse({ start: '2026-11-21T00:00:00Z', end: '2026-11-20T00:00:00Z', timezone: 'UTC' }).success);
   check('scheduleSchema accepts valid schedule', scheduleSchema.safeParse({ start: '2026-11-20T00:00:00Z', end: '2026-11-25T00:00:00Z', timezone: 'Asia/Dhaka' }).success);
   check('saveDraftSchema accepts valid pitch deck', saveDraftSchema.safeParse({ pitchDeck: [{ id: 'problem', heading: 'Problem', body: ['line'] }] }).success);
+  check('saveDraftSchema accepts custom sections', saveDraftSchema.safeParse({ customSections: [{ id: 'extra', heading: 'Extra', body: ['line'] }] }).success);
   check('saveDraftSchema rejects invalid feature status', !saveDraftSchema.safeParse({ featureMatrix: [{ name: 'x', description: 'y', status: 'bogus' }] }).success);
   check('saveDraftSchema accepts all roadmap categories', DOCS_ROADMAP_CATEGORIES.every((category) => saveDraftSchema.safeParse({ roadmap: [{ category, item: 'a', description: 'b' }] }).success));
   check('saveDraftSchema accepts all feature statuses', DOCS_FEATURE_STATUSES.every((status) => saveDraftSchema.safeParse({ featureMatrix: [{ name: 'x', description: 'y', status }] }).success));
@@ -85,6 +86,7 @@ function main() {
         settings: doc.settings,
         pitchDeck: doc.pitchDeck,
         productOverview: doc.productOverview,
+        customSections: doc.customSections,
         featureMatrix: doc.featureMatrix,
         roadmap: doc.roadmap,
         teamMembers: doc.teamMembers,
@@ -94,6 +96,7 @@ function main() {
         publishedAt: doc.publishedAt,
         publishedBy: doc.publishedBy,
         updatedBy: doc.updatedBy,
+        contentSeedVersion: doc.contentSeedVersion ?? 0,
       };
     };
     const restoreSnapshot = async (doc: DocumentationContentDoc | null): Promise<void> => {
@@ -105,9 +108,19 @@ function main() {
       // getDocsContentDoc seeds a doc when missing or returns the existing one.
       const seeded = await getDocsContentDoc();
       check('getDocsContentDoc returns existing or seeded doc', Boolean(seeded._id));
-      check('seeded doc has team members', Array.isArray(seeded.teamMembers) && seeded.teamMembers.length === 3);
+      check('seeded doc has team members', Array.isArray(seeded.teamMembers) && seeded.teamMembers.length >= 3);
       check('seeded doc has changelog', Array.isArray(seeded.changelog) && seeded.changelog.length >= 1);
       check('seed draft version starts at >= 1', Number(seeded.draftVersion ?? 0) >= 1);
+      check('seeded doc has custom sections array', Array.isArray(seeded.customSections));
+      check('content migration is marked complete', Number(seeded.contentSeedVersion ?? 0) >= 3);
+      const allCopy = JSON.stringify({
+        pitchDeck: seeded.pitchDeck,
+        productOverview: seeded.productOverview,
+        changelog: seeded.changelog,
+      });
+      check('seeded copy uses the correct product spelling', !/Shikhi Bondju/i.test(allCopy));
+      check('seeded team copy contains no invented responsibilities', !/leads Product & Engineering|research & design support|student success & training support/i.test(allCopy));
+      check('changelog includes the documentation CMS release', seeded.changelog.some((entry) => entry.version === '1.1.0'));
 
       // Visibility gating at service level.
       const seededVersion = Number(seeded.publishedVersion ?? 0);
@@ -157,12 +170,12 @@ function main() {
       check('stats numbers are number or null', numbers.every((k) => stats[k as keyof typeof stats] === null || typeof stats[k as keyof typeof stats] === 'number'));
 
       // Team CRUD.
-      const added = await docsContentService.addTeamMember({ name: 'Test Member', role: 'Member', contact: '+123456' });
+      const added = await docsContentService.addTeamMember({ name: 'Test Member', role: 'Member', contact: '+123456' }, 'admin@docs-test.local');
       check('addTeamMember adds member', added.member?.name === 'Test Member');
       check('added member has auto id', Boolean(added.member?.id));
       const updated = await docsContentService.updateTeamMember(added.member!.id, { name: 'Test Member 2' });
       check('updateTeamMember renames', updated.member?.name === 'Test Member 2');
-      const deleted = await docsContentService.deleteTeamMember(added.member!.id);
+      const deleted = await docsContentService.deleteTeamMember(added.member!.id, 'admin@docs-test.local');
       check('deleteTeamMember deletes', deleted.deleted === true);
       const confirmedDelete = await docsContentService.deleteTeamMember('m-01').catch((e) => e);
       check('confirmed members cannot be deleted', confirmedDelete && (confirmedDelete as { statusCode?: number }).statusCode === 409);

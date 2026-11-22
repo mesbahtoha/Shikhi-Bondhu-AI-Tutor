@@ -55,6 +55,8 @@ export interface DocsDraft {
   settings: DocsSettings;
   pitchDeck: DocsBlock[];
   productOverview: DocsBlock[];
+  /** Admin-created editorial sections shown after the built-in sections. */
+  customSections: DocsBlock[];
   featureMatrix: DocsFeatureRow[];
   roadmap: DocsRoadmapEntry[];
   teamMembers: DocsTeamMember[];
@@ -69,6 +71,7 @@ export interface DocumentationContentDoc extends mongoose.Document {
   settings: DocsSettings;
   pitchDeck: DocsBlock[];
   productOverview: DocsBlock[];
+  customSections: DocsBlock[];
   featureMatrix: DocsFeatureRow[];
   roadmap: DocsRoadmapEntry[];
   teamMembers: DocsTeamMember[];
@@ -78,6 +81,8 @@ export interface DocumentationContentDoc extends mongoose.Document {
   publishedAt: Date | null;
   publishedBy: string;
   updatedBy: string;
+  /** Internal marker used to apply one-time content corrections. */
+  contentSeedVersion: number;
 }
 
 const documentationContentSchema = new Schema(
@@ -85,6 +90,7 @@ const documentationContentSchema = new Schema(
     settings: { type: Object, default: () => ({ enabled: true, start: null, end: null, timezone: 'Asia/Dhaka' }) },
     pitchDeck: { type: Array, default: [] },
     productOverview: { type: Array, default: [] },
+    customSections: { type: Array, default: [] },
     featureMatrix: { type: Array, default: [] },
     roadmap: { type: Array, default: [] },
     teamMembers: { type: Array, default: [] },
@@ -94,6 +100,7 @@ const documentationContentSchema = new Schema(
     publishedAt: { type: Date, default: null },
     publishedBy: { type: String, default: '' },
     updatedBy: { type: String, default: '' },
+    contentSeedVersion: { type: Number, default: 0 },
   },
   { timestamps: true, collection: 'documentation_contents' }
 );

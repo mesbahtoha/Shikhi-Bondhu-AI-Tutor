@@ -619,6 +619,7 @@ export interface DocsDraft {
   settings: DocsSettings;
   pitchDeck: DocsBlock[];
   productOverview: DocsBlock[];
+  customSections: DocsBlock[];
   featureMatrix: DocsFeatureRow[];
   roadmap: DocsRoadmapEntry[];
   teamMembers: DocsTeamMember[];
@@ -631,6 +632,7 @@ export type DocsContent = DocsDraft;
 
 export interface DocsMeta {
   accessible: boolean;
+  reason: 'disabled' | 'scheduled' | 'unpublished' | null;
   enabled: boolean;
   version: number;
   window: { start: string | null; end: string | null; timezone: string };

@@ -1684,15 +1684,18 @@ body.drawer-open {
   margin: 6px 0;
 }
 
-@media (max-width: 767px) {
-  .public-header {
-    padding: 0 14px;
-  }
+@media (max-width: 1100px) {
   .public-nav-desktop {
     display: none;
   }
   .public-nav-toggle {
     display: inline-flex;
+  }
+}
+
+@media (max-width: 767px) {
+  .public-header {
+    padding: 0 14px;
   }
 }
 

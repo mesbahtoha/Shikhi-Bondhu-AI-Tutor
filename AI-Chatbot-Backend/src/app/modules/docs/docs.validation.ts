@@ -47,6 +47,7 @@ export const teamMemberPatchSchema = teamMemberBaseSchema.partial().extend({
 export const saveDraftSchema = z.object({
   pitchDeck: pitchBlockListSchema.optional(),
   productOverview: pitchBlockListSchema.optional(),
+  customSections: pitchBlockListSchema.optional(),
   featureMatrix: z.array(featureRowSchema).max(30).optional(),
   roadmap: z.array(roadmapEntrySchema).max(30).optional(),
   changelog: z.array(changelogEntrySchema).max(20).optional(),

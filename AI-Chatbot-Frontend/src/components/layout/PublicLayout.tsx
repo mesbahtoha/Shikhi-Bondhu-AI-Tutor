@@ -56,6 +56,7 @@ export function PublicLayout() {
           <NavLink to="/tutor" style={linkStyle} className={linkClass}>{t('nav.tutor')}</NavLink>
           <NavLink to="/practice" style={linkStyle} className={linkClass}>{t('nav.practice')}</NavLink>
           <NavLink to="/books" style={linkStyle} className={linkClass}>{t('nav.books')}</NavLink>
+          <NavLink to="/docs" style={linkStyle} className={linkClass}>{t('nav.docs')}</NavLink>
           <NavLink to="/about" style={linkStyle} className={linkClass}>{t('nav.about')}</NavLink>
           <NavLink to="/contact" style={linkStyle} className={linkClass}>{t('nav.contact')}</NavLink>
           {authed && user?.role === 'admin' && <NavLink to="/admin" style={linkStyle} className={linkClass}>{t('nav.dashboard')}</NavLink>}
@@ -106,6 +107,7 @@ export function PublicLayout() {
           <Link to="/tutor" className="nav-link" onClick={close}>{t('nav.tutor')}</Link>
           <Link to="/practice" className="nav-link" onClick={close}>{t('nav.practice')}</Link>
           <Link to="/books" className="nav-link" onClick={close}>{t('nav.books')}</Link>
+          <Link to="/docs" className="nav-link" onClick={close}>{t('nav.docs')}</Link>
           <Link to="/about" className="nav-link" onClick={close}>{t('nav.about')}</Link>
           <Link to="/contact" className="nav-link" onClick={close}>{t('nav.contact')}</Link>
           <Link to="/help" className="nav-link" onClick={close}>{t('nav.help')}</Link>
@@ -154,6 +156,7 @@ export function PublicLayout() {
               <Link to="/tutor">{t('nav.tutor')}</Link>
               <Link to="/practice">{t('nav.practice')}</Link>
               <Link to="/books">{t('nav.books')}</Link>
+              <Link to="/docs">{t('nav.docs')}</Link>
             </div>
             <div>
               <h4>{t('footer.support')}</h4>

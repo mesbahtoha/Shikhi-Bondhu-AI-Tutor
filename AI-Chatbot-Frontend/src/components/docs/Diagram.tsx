@@ -23,97 +23,145 @@ function Label({ x, y, text }: { x: number; y: number; text: string }) {
 }
 
 function Arrow({ x1, y1, x2, y2 }: { x1: number; y1: number; x2: number; y2: number }) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const endX = x2 - (dx / length) * 10;
+  const endY = y2 - (dy / length) * 10;
   return (
     <path
-      d={`M ${x1} ${y1} L ${x2 - 10} ${y2}`}
+      d={`M ${x1} ${y1} L ${endX} ${endY}`}
       stroke={STROKE}
       strokeWidth={1.5}
       fill="none"
-      markerEnd="url(#arrow)"
+      markerEnd="url(#archArrow)"
     />
   );
 }
 
 export function ArchitectureDiagram() {
   return (
-    <svg viewBox="0 0 820 420" width="100%" height="420" style={{ maxHeight: 420, borderRadius: 12 }} xmlns="http://www.w3.org/2000/svg">
+    <svg
+      viewBox="0 0 1080 570"
+      width="100%"
+      style={{ minWidth: 820, width: '100%', height: 'auto', borderRadius: 12 }}
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Shikhi Bondhu system architecture"
+    >
       <defs>
-        <marker id="arrow" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L0,6 L8,3 z" fill="currentColor" />
+        <marker id="archArrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L0,6 L8,3 z" fill="var(--text-muted)" />
         </marker>
-        <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--color-primary)" />
-          <stop offset="100%" stopColor="var(--color-primary)" />
-        </linearGradient>
       </defs>
-      <Box x={10} y={10} width={240} height={390} title="Students &amp; admins (React frontend)" subtitle="Public /docs, /api/v1/docs, /admin/docs, /practice, /tutor" />
-      <Box x={280} y={10} width={270} height={390} accent title="Node.js + Express 4" subtitle="Routes → validators → services" />
-      <Box x={560} y={10} width={250} height={110} title="Docs services" subtitle="Content service, versioning, visibility" />
-      <Box x={560} y={150} width={250} height={110} title="Practice services" subtitle="Attempt lifecycle, deterministic evaluator" />
-      <Box x={560} y={290} width={250} height={110} title="Admin &amp; AI services" subtitle="CMS, RAG retrieval, AI providers" />
-      <Box x={100} y={220} width={160} height={80} title="MongoDB" subtitle="documentation_contents, versions" />
-      <Box x={720} y={220} width={100} height={80} title="OpenRouter" subtitle="Gemini 2.5 Flash Lite" />
-      <Label x={190} y={410} text="HTTP /api/v1/*" />
-      <Label x={640} y={410} text="AI calls" />
-      <Arrow x1={270} y1={80} x2={280} y2={80} />
-      <Arrow x1={270} y1={200} x2={280} y2={200} />
-      <Arrow x1={270} y1={340} x2={280} y2={340} />
-      <Arrow x1={560} y1={65} x2={790} y2={65} />
-      <Arrow x1={560} y1={205} x2={790} y2={205} />
-      <Arrow x1={560} y1={345} x2={820} y2={360} />
-      <Arrow x1={400} y1={100} x2={400} y2={270} />
-      <Arrow x1={430} y1={300} x2={720} y2={300} />
+
+      <Box x={20} y={20} width={300} height={112} accent title="React 18 + Vite frontend" subtitle="Public site · Tutor · Practice · Admin · /docs" />
+      <Box x={370} y={20} width={330} height={112} accent title="Express 4 API  /api/v1" subtitle="JWT auth · Zod validation · rate limits · SSE" />
+      <Box x={750} y={20} width={310} height={112} accent title="Application services" subtitle="Tutor · books · practice · docs · admin" />
+
+      <Box x={20} y={170} width={300} height={112} title="Textbook retrieval" subtitle="Published book chunks · lexical BM25" />
+      <Box x={20} y={320} width={300} height={100} title="Ingestion + OCR" subtitle="pdfjs · canvas · Tesseract · vision fallback" />
+      <Box x={20} y={454} width={300} height={94} title="Prompt + citation layer" subtitle="Untrusted context · server-side citation checks" />
+
+      <Box x={370} y={170} width={330} height={112} title="Auth + RBAC" subtitle="Users/admins · refresh rotation · quotas" />
+      <Box x={370} y={320} width={330} height={100} title="Practice evaluator" subtitle="Deterministic scoring · attempts · results" />
+      <Box x={370} y={454} width={330} height={94} title="Docs CMS + statistics" subtitle="Draft · preview · publish · schedule · versions" />
+
+      <Box x={750} y={170} width={310} height={112} title="MongoDB + Mongoose" subtitle="Books · chunks · chats · practice · docs" />
+      <Box x={750} y={320} width={310} height={100} title="GridFS uploads bucket" subtitle="Textbook PDFs · notice files · avatars" />
+      <Box x={750} y={454} width={310} height={94} title="AI provider router" subtitle="OpenRouter · Anthropic · Gemini · compatible · mock" />
+
+      <Arrow x1={320} y1={76} x2={370} y2={76} />
+      <Arrow x1={700} y1={76} x2={750} y2={76} />
+      <Arrow x1={535} y1={132} x2={535} y2={170} />
+      <Arrow x1={535} y1={282} x2={535} y2={320} />
+      <Arrow x1={535} y1={420} x2={535} y2={454} />
+
+      <Arrow x1={370} y1={225} x2={320} y2={225} />
+      <Arrow x1={370} y1={370} x2={320} y2={370} />
+      <Arrow x1={370} y1={500} x2={320} y2={500} />
+
+      <Arrow x1={905} y1={132} x2={905} y2={170} />
+      <Arrow x1={905} y1={282} x2={905} y2={320} />
+      <Arrow x1={905} y1={420} x2={905} y2={454} />
+
+      <Label x={345} y={156} text="HTTP" />
+      <Label x={725} y={156} text="service calls" />
+      <Label x={117} y={300} text="retrieval inputs" />
+      <Label x={1040} y={300} text="persistence" />
+      <Label x={710} y={540} text="provider fallback only before the first streamed token" />
     </svg>
   );
 }
 
 export function AiDataFlowDiagram() {
   const steps = [
-    { id: 'detect', label: 'Language detection', text: 'Script detection + normalization (Bangla/Banglish/English)' },
-    { id: 'banglish', label: 'Banglish processing', text: 'Query variants for search-optimized forms' },
-    { id: 'retrieve', label: 'Textbook retrieval', text: 'Lexical keyword scoring over PUBLISHED books (BookChunk)' },
-    { id: 'context', label: 'Context construction', text: 'Build prompt from retrieved passages with citations' },
-    { id: 'route', label: 'Provider routing', text: 'Resolve provider + model (fast/balanced/accurate modes)' },
-    { id: 'generate', label: 'LLM generation', text: 'Answer generation via OpenRouter (Gemini 2.5 Flash Lite)' },
-    { id: 'cite', label: 'Citation validation', text: 'Server-side validation of cited books/pages' },
-    { id: 'insufficient', label: 'Insufficient-context handling', text: 'Honest fallbacks when no good context exists' },
-    { id: 'respond', label: 'Student response', text: 'Textbook-grounded answer with source links' },
+    { label: 'Student question', text: 'Original message preserved' },
+    { label: 'Language detection', text: 'Bangla / English / Banglish' },
+    { label: 'Query processing', text: 'Stems + Banglish variants' },
+    { label: 'Textbook retrieval', text: 'Published chunks only' },
+    { label: 'Relevance scoring', text: 'BM25 + heading bonuses' },
+    { label: 'Context construction', text: 'Top chunks marked untrusted' },
+    { label: 'Provider routing', text: 'Mode + model + fallbacks' },
+    { label: 'Answer generation', text: 'Provider call + sanitization' },
+    { label: 'Citation validation', text: 'Chunk IDs + page metadata' },
+    { label: 'Student response', text: 'Answer or insufficient context' },
   ];
-  const W = 1100;
-  const H = 380;
-  const headerY = 30;
+  const W = 1080;
+  const H = 430;
+
+  function FlowNode({ step, index, x, y }: { step: { label: string; text: string }; index: number; x: number; y: number }) {
+    return (
+      <g>
+        <rect x={x} y={y} width={182} height={104} rx={14} fill={BG} stroke={BORDER} strokeWidth={1} />
+        <circle cx={x + 24} cy={y + 24} r={14} fill="var(--color-primary)" />
+        <text x={x + 24} y={y + 28} fontFamily="Outfit, system-ui, sans-serif" fontSize={12} fontWeight={800} fill="var(--text-primary)" textAnchor="middle">{index + 1}</text>
+        <text x={x + 16} y={y + 56} fontFamily="Outfit, system-ui, sans-serif" fontSize={12.5} fontWeight={800} fill={FILL}>{step.label}</text>
+        <text x={x + 16} y={y + 76} fontFamily="Outfit, system-ui, sans-serif" fontSize={10.5} fill={STROKE}>{step.text}</text>
+      </g>
+    );
+  }
+
+  const rowOneY = 74;
+  const rowTwoY = 246;
+  const startX = 24;
+  const gapX = 208;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="380" style={{ borderRadius: 12 }} xmlns="http://www.w3.org/2000/svg">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      width="100%"
+      style={{ minWidth: 820, width: '100%', height: 'auto', borderRadius: 12 }}
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="AI Tutor retrieval and generation data flow"
+    >
       <defs>
-        <marker id="arrow2" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L0,6 L8,3 z" fill="currentColor" />
+        <marker id="flowArrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L0,6 L8,3 z" fill="var(--text-muted)" />
         </marker>
       </defs>
-      {steps.map((step, index) => {
-        const x = 120 + index * (W - 240) / (steps.length - 1);
-        const y = 100;
-        return (
-          <g key={step.id}>
-            <circle cx={x} cy={y} r={22} fill="var(--color-primary)" />
-            <text x={x} y={y + 7} fontFamily="Outfit, system-ui, sans-serif" fontSize={12} fontWeight={800} fill="var(--text-primary)" textAnchor="middle">{index + 1}</text>
-            <text x={x} y={y + 46} fontFamily="Outfit, system-ui, sans-serif" fontSize={13} fontWeight={800} fill={FILL} textAnchor="middle">{step.label}</text>
-            <text x={x} y={y + 65} fontFamily="Outfit, system-ui, sans-serif" fontSize={11} fill={STROKE} textAnchor="middle">{step.text}</text>
-          </g>
-        );
-      })}
-      {steps.slice(0, -1).map((step, index) => {
-        const x1 = 120 + index * (W - 240) / (steps.length - 1);
-        const x2 = 120 + (index + 1) * (W - 240) / (steps.length - 1);
-        return (
-          <path key={`${step.id}-arrow`} d={`M ${x1 + 90} 110 L ${x2 - 90} 110`} stroke={STROKE} strokeWidth={1.5} fill="none" markerEnd="url(#arrow2)" />
-        );
-      })}
-      <text x={110} y={headerY} fontFamily="Outfit, system-ui, sans-serif" fontSize={16} fontWeight={800} fill={FILL}>AI Tutor data flow</text>
-      <rect x={0} y={headerY + 20} width={W} height={1} fill={BORDER} />
-      <rect x={0} y={headerY + 20} width={4} height={270} rx={2} fill="var(--color-primary)" />
-      <rect x={0} y={headerY + 20} width={120} height={28} rx={10} fill={BG} stroke={BORDER} />
-      <text x={60} y={headerY + 33} fontFamily="Outfit, system-ui, sans-serif" fontSize={12} textAnchor="middle" fill={STROKE}>Student question</text>
-      <text x={60} y={headerY + 60} fontFamily="Outfit, system-ui, sans-serif" fontSize={11} fill={STROKE}>Enters the pipeline from the web app.</text>
+
+      <text x={24} y={34} fontFamily="Outfit, system-ui, sans-serif" fontSize={16} fontWeight={800} fill={FILL}>AI Tutor data flow</text>
+      <text x={24} y={52} fontFamily="Outfit, system-ui, sans-serif" fontSize={11} fill={STROKE}>Lexical retrieval · validated citations · provider fallback · honest insufficient-context handling</text>
+
+      {steps.slice(0, 5).map((step, index) => (
+        <FlowNode key={step.label} step={step} index={index} x={startX + index * gapX} y={rowOneY} />
+      ))}
+      {steps.slice(5).map((step, index) => (
+        <FlowNode key={step.label} step={step} index={index + 5} x={startX + (4 - index) * gapX} y={rowTwoY} />
+      ))}
+
+      {[0, 1, 2, 3].map((index) => (
+        <path key={`row1-${index}`} d={`M ${startX + index * gapX + 182} ${rowOneY + 52} L ${startX + (index + 1) * gapX - 10} ${rowOneY + 52}`} stroke={STROKE} strokeWidth={1.5} fill="none" markerEnd="url(#flowArrow)" />
+      ))}
+      <path d={`M ${startX + 4 * gapX + 91} ${rowOneY + 104} L ${startX + 4 * gapX + 91} ${rowTwoY - 10}`} stroke={STROKE} strokeWidth={1.5} fill="none" markerEnd="url(#flowArrow)" />
+      {[0, 1, 2, 3].map((index) => (
+        <path key={`row2-${index}`} d={`M ${startX + (4 - index) * gapX} ${rowTwoY + 52} L ${startX + (3 - index) * gapX + 192} ${rowTwoY + 52}`} stroke={STROKE} strokeWidth={1.5} fill="none" markerEnd="url(#flowArrow)" />
+      ))}
+
+      <rect x={24} y={388} width={1032} height={1} fill={BORDER} />
+      <text x={24} y={410} fontFamily="Outfit, system-ui, sans-serif" fontSize={11} fill={STROKE}>Retrieval is lexical, not vector-based. An attached file is treated as the source of truth instead of book retrieval.</text>
     </svg>
   );
 }

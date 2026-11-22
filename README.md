@@ -55,8 +55,12 @@ still present and functional.
   browser Web Speech API.
 - **Chat workspace** - the retained NoticeFlow chat with saved conversations, SSE streaming,
   notice citations, share links, and transcript export.
-- **Practice and exams** - admin-authored, book- and chapter-wise question sets with seven
-  question types, Practice and Exam modes, automatic scoring, and a safe lesson-slide player.
+- **Practice and exams** - admin-authored, book- and chapter-wise question sets with five
+  active question types, Practice and Exam modes, deterministic server-side scoring, and a
+  safe lesson-slide player. Legacy fill-in-the-blank and rearrange attempts remain renderable.
+- **Live documentation** - a public `/docs` presentation with a pitch deck, technical
+  whitepaper, feature matrix, architecture and AI-flow diagrams, API reference, Team Infyners,
+  live aggregate statistics, roadmap, changelog, search and exports.
 - **Bilingual UI** - English / বাংলা interface with light and dark themes.
 
 ### For administrators
@@ -64,7 +68,11 @@ still present and functional.
 - Upload and process textbook PDFs in the background, review chunks, then publish.
 - Switch AI provider and model at runtime; provider credential status is masked.
 - Manage users, notices, prompt templates, app settings, analytics, token usage, and logs.
-- Every admin route requires a valid admin JWT.
+- Edit the documentation CMS: pitch deck, product overview, custom sections, feature statuses,
+  roadmap, changelog and Team Infyners; preview drafts; publish; restore versions; and control
+  public docs with an ON/OFF switch plus a timezone-aware publishing window.
+- Every admin route requires a valid admin JWT, including documentation editing while public
+  documentation is disabled.
 
 ### Grounding and safety
 
@@ -85,9 +93,9 @@ still present and functional.
 
 ```text
 Browser (React + Vite)
- ├─ Public site: landing, tutor, books, practice, lesson player, practice & exams
+ ├─ Public site: landing, tutor, books, practice, lesson player, practice & exams, /docs
  ├─ Chat workspace (auth): SSE streaming, citations, share, export
- └─ Admin console (admin JWT): books, providers, users, notices, logs, analytics
+ └─ Admin console (admin JWT): books, providers, users, notices, logs, analytics, docs CMS
             │
             │ HTTPS + Bearer JWT (refresh-token rotation)
             ▼
@@ -97,6 +105,7 @@ Express API  (/api/v1, plus legacy /api routes)
  ├─ Tutor API ──► book retrieval ──► prompt builder ──► provider router
  │                                             └─► sanitize + citation validation
  ├─ Admin API ──► books, providers, settings, notices, logs, analytics
+ ├─ Docs API ──► published snapshots, visibility gate, aggregate stats, team media
  ├─ Notice chat workspace ──► notice search + citations ──► SSE
  └─ Attachments: in-memory temporary store (images/PDF, 10 MB x 5)
             │
@@ -106,7 +115,8 @@ MongoDB (Atlas or local)
  ├─ users, admin, refreshtokens, conversations, messages
  ├─ documents (notices), chunks, chatLogs, feedback
  ├─ aiusage, settings, prompttemplates, logs
- └─ GridFS bucket "uploads" (book PDFs, notice files, avatars)
+ ├─ documentation_contents, documentation_versions
+ └─ GridFS bucket "uploads" (book PDFs, notice files, user/team avatars)
 ```
 
 The backend runs either as a normal Node server (`src/server.ts`) or as a Vercel
@@ -153,7 +163,7 @@ Ai-Chatbot/
 │  ├─ api/index.ts                 # Vercel serverless entry
 │  ├─ src/
 │  │  ├─ app/modules/              # auth, user, conversation, message, tutor, books,
-│  │  │                            # attachment, admin, legacy, analytics
+│  │  │                            # attachment, admin, docs, legacy, analytics
 │  │  ├─ config/                   # env, db, logger, GridFS
 │  │  ├─ database/                 # models, indexes, seeders
 │  │  ├─ middleware/               # auth, role, validation, rate limits, upload, errors
@@ -161,19 +171,22 @@ Ai-Chatbot/
 │  │  ├─ routes/v1.routes.ts       # /api/v1 router
 │  │  ├─ services/
 │  │  │  ├─ ai/                    # tutor, providers, router, prompts, validator
+│  │  │  ├─ docs/                  # docs content, migration, versions, stats
 │  │  │  └─ rag/                   # book ingestion, extraction, retrieval, embeddings
 │  │  ├─ app.ts                    # Express assembly
 │  │  └─ server.ts                 # Node entry point
-│  ├─ tests/run.ts                 # 72 offline checks
+│  ├─ tests/run.ts                 # 72 offline tutor checks
+│  ├─ tests/practice.ts            # 20 practice evaluator checks
+│  ├─ tests/docs.ts                # timezone, schema, CMS, stats and DB checks
 │  ├─ api/ · vercel.json · tsconfig.api.json
 │  └─ .env.example
 ├─ AI-Chatbot-Frontend/
 │  ├─ src/
-│  │  ├─ pages/                    # public, tutor, books, practice, auth, chat, admin
-│  │  ├─ components/               # chat, lesson, landing, layout, ui
+│  │  ├─ pages/                    # public, tutor, books, practice, docs, auth, chat, admin
+│  │  ├─ components/               # chat, docs diagrams, lesson, landing, layout, ui
 │  │  ├─ hooks/                    # SSE chat session, speech-to-text, voice mode
 │  │  ├─ store/                    # zustand auth, chat, tutor stores
-│  │  ├─ lib/                      # API client, tutor API, i18n, theme
+│  │  ├─ lib/                      # API client, tutor/docs APIs, timezone helper, i18n
 │  │  ├─ routes/guards.tsx         # auth, admin, public-only route guards
 │  │  └─ App.tsx                   # route table with lazy loading
 │  ├─ public/ · vercel.json · vite.config.ts
@@ -464,9 +477,11 @@ Tutor request body:
 | --- | --- | --- | --- |
 | GET | `/api/v1/books?subject=&grade=&curriculum=&search=` | Public | Published catalogue only |
 | GET | `/api/v1/books/:id` | Public | Book info plus up to 6 sample chunk previews |
+| GET | `/api/v1/books/:id/download` | Public | Stream the stored PDF with byte-range support |
 | GET | `/api/v1/books/meta/subjects` | Public | Distinct published subjects |
 
-Raw book files are never served through the public book routes.
+Raw book files are never served through the metadata routes; the dedicated download route
+streams the stored PDF.
 
 ### Conversations and messages
 
@@ -488,6 +503,24 @@ Raw book files are never served through the public book routes.
 
 SSE event types: `start`, `token`, `citations`, `usage`, `done`, `error`.
 
+### Practice & examinations
+
+| Method | Path | Access | Notes |
+| --- | --- | --- | --- |
+| GET | `/api/v1/practice/books` | Public | Practice-enabled books |
+| GET | `/api/v1/practice/books/:bookId/chapters` | Public | Chapters available for the book |
+| GET | `/api/v1/practice/sets` | Public | Published question sets; filters by book, chapters, type, mode |
+| GET | `/api/v1/practice/sets/:id` | Public | One published set |
+| POST | `/api/v1/practice/attempts` | Guest header or Auth | Start a practice/exam attempt |
+| GET | `/api/v1/practice/attempts` | Guest header or Auth | List the actor's attempts |
+| GET | `/api/v1/practice/attempts/:attemptId` | Guest header or Auth | Load an attempt and evaluation |
+| POST | `/api/v1/practice/attempts/:attemptId/answers` | Guest header or Auth | Auto-save draft answers |
+| POST | `/api/v1/practice/attempts/:attemptId/check` | Guest header or Auth | Check one practice answer |
+| POST | `/api/v1/practice/attempts/:attemptId/submit` | Guest header or Auth | Submit and deterministically evaluate |
+
+Guests use the `x-practice-guest` header with a device-scoped id. The server hashes the id;
+it never becomes an account identity.
+
 ### Attachments
 
 | Method | Path | Access | Notes |
@@ -497,6 +530,31 @@ SSE event types: `start`, `token`, `citations`, `usage`, `done`, `error`.
 Limits: 10 MB per file, PNG/JPEG/WebP/PDF only, magic-byte verified, in-memory only,
 single-use, 30-minute TTL. The active model must support vision for images; otherwise the
 API returns `422` before consuming quota.
+
+### Documentation
+
+| Method | Path | Access | Notes |
+| --- | --- | --- | --- |
+| GET | `/api/v1/docs/meta` | Public | Accessibility, reason, version and schedule window |
+| GET | `/api/v1/docs/content` | Public | Published snapshot; `403` disabled/scheduled, `404` unpublished |
+| GET | `/api/v1/docs/stats` | Public | Aggregate-only statistics under the same visibility gate |
+| GET | `/api/v1/docs/media/:memberId` | Public | Stream a published team avatar |
+| GET | `/api/v1/admin/docs` | Admin | Draft, published version pointer and version list |
+| PUT | `/api/v1/admin/docs` | Admin | Save pitch deck, product overview, custom sections, features, roadmap, changelog |
+| POST | `/api/v1/admin/docs/publish` | Admin | Publish an immutable snapshot |
+| POST | `/api/v1/admin/docs/unpublish` | Admin | Disable public documentation |
+| PUT | `/api/v1/admin/docs/enabled` | Admin | Enable/disable public access |
+| PUT | `/api/v1/admin/docs/schedule` | Admin | Set `start`, `end`, and IANA `timezone` |
+| GET | `/api/v1/admin/docs/versions` | Admin | Published version history |
+| POST | `/api/v1/admin/docs/versions/:version/restore` | Admin | Restore a version into the draft |
+| POST | `/api/v1/admin/docs/team` | Admin | Add a team member (multipart, optional avatar) |
+| PATCH | `/api/v1/admin/docs/team/:memberId` | Admin | Edit name, role or contact |
+| POST | `/api/v1/admin/docs/team/:memberId/avatar` | Admin | Upload/replace a profile image |
+| DELETE | `/api/v1/admin/docs/team/:memberId` | Admin | Remove a non-confirmed member |
+
+Visibility is enforced by the backend. Admin editing routes remain protected when public
+documentation is disabled. Aggregate statistics never include user PII, message text or
+credentials.
 
 ### Admin
 
@@ -743,7 +801,9 @@ Default mode mapping:
 | `/books` | Published book catalogue |
 | `/books/:bookId` | Book detail with sample chunks |
 | `/learn` and `/learn/:lessonId` | Lesson slide player |
-| `/practice` | Offline practice quizzes |
+| `/practice` | Practice and examination wizard |
+| `/practice/attempt/:attemptId` | Attempt page with answer checking, timer and results |
+| `/docs` | Public live documentation, pitch deck, technical reference and live statistics |
 | `/about`, `/contact`, `/help`, `/privacy` | Informational pages |
 | `/login`, `/register`, `/forgot-password`, `/reset-password` | Auth (public-only guard) |
 | `/share/:token` | Shared conversation view |
@@ -757,6 +817,8 @@ Default mode mapping:
 | `/admin/users` | User management |
 | `/admin/books` | Textbook upload, processing, publishing |
 | `/admin/practice` | Practice & exam question set management |
+| `/admin/docs` | Documentation CMS, team, versions and publishing controls |
+| `/admin/docs/preview` | Full draft preview using the public documentation renderer |
 | `/admin/ai-settings` | Provider/model switching and validation |
 | `/admin/notices` | Notice management |
 | `/admin/chats` | Chat history |
@@ -770,11 +832,12 @@ Default mode mapping:
 ### Admin practice workflow
 
 1. **Create a set**: title, book, a subset of the book's chapters (or all chapters), one of
-   the seven question types, marks per question, and practice/exam modes. Exams require a
-   duration. New sets are always drafts.
+   the five active question types, marks per question, and practice/exam modes. Exams require
+   a duration. New sets are always drafts.
 2. **Add questions**: the builder is type-aware (MCQ options with a correct-answer radio,
-   fill-in-the-blank markers, true/false, matching pairs, one-word answers, rearrange order,
-   translation). Every save is validated on the client and again on the server.
+   true/false, matching pairs, one-word answers, translation). Legacy fill-in-the-blank and
+   rearrange questions remain renderable in older attempts. Every save is validated on the
+   client and again on the server.
 3. **Edit safely**: opening a question restores its stored options, correct answer, accepted
    alternatives, matching pairs and correct rearrange order. Editing a set preserves its
    exact chapter subset.
@@ -796,6 +859,54 @@ Frontend behavior worth knowing:
   sent to a custom backend.
 - Theme and UI language persist in `localStorage`.
 
+### Live documentation module (`/docs`)
+
+The public `/docs` route is a database-backed project presentation and technical whitepaper.
+It renders only a **published snapshot**; the editable draft stays private.
+
+- **Public sections**: YC-style pitch deck, product overview, feature matrix, system
+  architecture, AI data flow, technology stack, grouped API reference, data layer, AI layer,
+  security/scalability, roadmap, Team Infyners, live aggregate statistics and changelog.
+- **Team Infyners**: Mesbahul Alam (Team Lead), MONIRUZZAMAN Shaon (Member) and
+  Halima Tuz Sadia (Member). Contact details are the supplied numbers. Missing profile
+  images use a uniform initials avatar; no biographies or social links are invented.
+- **Live statistics**: registered users, conversations, messages, published books,
+  practice/exam attempts, published practice sets, AI usage records, and users with an
+  unexpired refresh session. Each metric can independently report `unavailable`; unavailable
+  is visually distinct from zero.
+- **Search and navigation**: sticky desktop sidebar, mobile section picker, anchor links,
+  active-section tracking and full-text section filtering.
+- **Exports**: Markdown download and browser print-to-PDF, both generated from the currently
+  published snapshot. API groups are expanded for printing.
+- **Sharing**: the public URL and current section anchor can be copied from the page.
+
+**Admin CMS (`/admin/docs`)**
+
+- Edit pitch deck and product-overview blocks, add/remove custom sections, edit the feature
+  matrix and routes, roadmap, changelog and Team Infyners.
+- Save drafts, preview the exact draft at `/admin/docs/preview`, publish a version, or
+  disable public access.
+- Upload/replace team profile images; the three confirmed members are protected from deletion.
+- Configure an ON/OFF switch and an optional start/end window. The selected IANA timezone is
+  used to convert the admin's wall-clock input to UTC, and the backend re-checks the window
+  for every public request.
+- Version history stores immutable published snapshots and can restore one into the draft.
+
+**Storage**
+
+- `documentation_contents`: singleton draft, settings, published-version pointer and seed
+  migration marker.
+- `documentation_versions`: immutable published snapshots.
+- GridFS `uploads`: optional team avatars (draft avatar files are only public after publish).
+
+The server applies a one-time content migration to earlier documentation seeds. It upgrades
+the editorial arrays to the reviewed pitch/technical copy while preserving admin-created
+custom sections, team-member edits, publication settings and the currently published version
+pointer.
+
+No new environment variables are required. The module uses the existing MongoDB connection,
+JWT authentication, admin RBAC, GridFS bucket and Vercel deployment.
+
 ---
 
 ## Tests and type checks
@@ -803,7 +914,9 @@ Frontend behavior worth knowing:
 ```bash
 cd AI-Chatbot-Backend
 
-npm run test:tutor       # 72 offline checks: no network, no database
+npm run test:tutor       # 72 offline tutor checks: no network, no database
+npm run test:practice    # 20 deterministic practice-evaluator checks
+npm run test:docs        # timezone/schema checks + DB tests when MONGO_URI is set
 npm run typecheck        # tsc --noEmit + serverless API tsconfig
 npm run build            # compile to dist/
 
@@ -825,7 +938,19 @@ npm run build            # type-check + Vite production build
 - Attachment magic-byte checks
 - Quiz schema validation
 
-Expected result: `72 passed, 0 failed`.
+Expected results: `test:tutor` → `72 passed, 0 failed`; `test:practice` →
+`20 passed, 0 failed`; `test:docs` → `57 passed, 0 failed` with MongoDB reachable
+(the DB block is skipped when `MONGO_URI` is unset).
+
+The documentation module was also verified in a real browser with Playwright:
+
+- public `/docs` desktop (1440 px), tablet/mobile (390 px) and Bangla layout;
+- disabled and scheduled visibility states;
+- admin authentication, draft preview, custom sections, team CRUD/avatar upload;
+- unpublished draft isolation from the public snapshot;
+- statistics loading/unavailable states;
+- Markdown export contents and section search;
+- no horizontal page overflow or runtime console errors.
 
 ---
 
@@ -855,6 +980,10 @@ Required environment variables:
 | `OPENROUTER_API_KEY` | Or the key for the provider chosen in Admin → AI Settings |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Seeded on first boot only |
 | `APP_BASE_URL` | Public frontend URL used in reset links, e.g. `https://<frontend>.vercel.app` |
+
+Documentation needs no separate service or environment variable. It uses the same API,
+MongoDB connection, JWT secrets, GridFS bucket and admin account. After deployment, open
+**Admin → Documentation**, review the seeded content, and publish a version.
 
 Health check:
 
@@ -954,6 +1083,14 @@ the MongoDB log transport, which powers the admin **Logs** page in serverless de
   instance, or replace the store with a shared short-TTL store.
 - **Practice content is admin-authored.** Practice and exam sets are created in the admin
   panel; only the tutor quiz endpoint is generated from book context.
+- **Documentation statistics are aggregate and near-real-time.** The endpoint caches for five
+  seconds and the page refreshes every 60 seconds while visible. “Active users” is a proxy
+  based on unexpired refresh sessions, not a live online counter.
+- **Documentation scheduling uses IANA timezones.** The admin UI converts the selected local
+  wall-clock time to UTC; unusual timezone database changes or browser clock drift can shift
+  a window by the zone offset.
+- **Documentation export is Markdown + browser print-to-PDF.** There is no server-rendered
+  PDF binary; the print CSS expands API groups and hides interactive controls.
 - **No parent/teacher dashboards, mobile app, or payments.**
 - **UI localization covers interface chrome.** Tutor answer language is decided per request.
 - **Admin-provided provider keys live in settings.** Prefer environment secrets in
