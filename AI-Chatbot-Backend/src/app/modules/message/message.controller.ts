@@ -39,6 +39,14 @@ async function streamAiResponse(
   const onClose = () => abortController.abort();
   res.on('close', onClose);
 
+  // Carrier proxies and load balancers can drop a stream that stays quiet for
+  // ~30s (for example while the provider is still thinking). A comment frame
+  // keeps the socket warm and is ignored by the SSE client.
+  const heartbeat = setInterval(() => {
+    if (res.writableEnded || res.destroyed) return;
+    res.write(': keep-alive\n\n');
+  }, 15000);
+
   writeEvent(res, {
     type: 'start',
     messageId: String(assistantId),
@@ -214,6 +222,7 @@ async function streamAiResponse(
     }
     writeEvent(res, { type: 'done', messageId: String(assistantId), status: stopped ? 'stopped' : 'error' });
   } finally {
+    clearInterval(heartbeat);
     // Temporary attachments are single-use: free their memory as soon as the
     // response finishes (success, error, or aborted). Nothing is stored.
     if (prepared.attachmentIds.length) {

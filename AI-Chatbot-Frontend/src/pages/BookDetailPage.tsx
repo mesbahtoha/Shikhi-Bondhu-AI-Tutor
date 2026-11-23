@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { MdDownload, MdMenuBook } from 'react-icons/md';
 import { getBook, listBooks } from '@/lib/tutor';
-import { API_BASE_URL } from '@/lib/api';
+import { API_BASE_URL, ApiRequestError, getErrorMessage } from '@/lib/api';
+import { RequestErrorState, SlowLoadingNotice, useSlowLoading } from '@/components/ui/RequestState';
 import { useTutorStore } from '@/store/tutor.store';
 import { useLang } from '@/lib/i18n';
 import type { BookInfo } from '@/types';
@@ -23,20 +24,33 @@ export function BookDetailPage() {
   const bn = lang === 'bn';
   const [book, setBook] = useState<BookInfo | null>(null);
   const [related, setRelated] = useState<BookInfo[]>([]);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     if (!bookId) return;
     const controller = new AbortController();
     let active = true;
     setBook(null);
-    setError('');
+    setError(null);
+    setNotFound(false);
+    setLoading(true);
     getBook(bookId, controller.signal)
       .then((r) => {
         if (active) setBook(r.book);
       })
-      .catch(() => {
-        if (active) setError('Book not found.');
+      .catch((err: unknown) => {
+        if (!active || controller.signal.aborted) return;
+        if (err instanceof ApiRequestError && err.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        setError(getErrorMessage(err));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     listBooks(undefined, controller.signal)
       .then((all) => {
@@ -49,19 +63,48 @@ export function BookDetailPage() {
       active = false;
       controller.abort();
     };
-  }, [bookId]);
+  }, [bookId, reloadTick]);
 
-  if (error) {
+  const slow = useSlowLoading(loading);
+  const retry = useCallback(() => setReloadTick((tick) => tick + 1), []);
+
+  if (notFound) {
     return (
       <div className="pg-app" style={{ padding: 24 }}>
         <div className="pg-container" style={{ maxWidth: 720 }}>
-          <p>{bn ? 'বইটি পাওয়া যায়নি।' : error}</p>
+          <p>{bn ? 'বইটি পাওয়া যায়নি।' : 'This book could not be found.'}</p>
           <Link to="/books" className="pg-btn-secondary">{bn ? 'সব বই' : 'All books'}</Link>
         </div>
       </div>
     );
   }
-  if (!book) return <div className="pg-app" style={{ padding: 24 }}><div className="pg-container"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-text" /><div className="skeleton skeleton-text short" /></div></div>;
+  if (error) {
+    return (
+      <div className="pg-app" style={{ padding: 24 }}>
+        <div className="pg-container" style={{ maxWidth: 720 }}>
+          <RequestErrorState
+            icon="📚"
+            title={bn ? 'বই লোড করা যায়নি' : 'Could not load this book'}
+            description={error}
+            onRetry={retry}
+            secondaryAction={<Link to="/books" className="pg-btn-secondary">{bn ? 'সব বই' : 'All books'}</Link>}
+          />
+        </div>
+      </div>
+    );
+  }
+  if (loading || !book) {
+    return (
+      <div className="pg-app" style={{ padding: 24 }}>
+        <div className="pg-container">
+          <div className="skeleton skeleton-title" />
+          <div className="skeleton skeleton-text" />
+          <div className="skeleton skeleton-text short" />
+          <SlowLoadingNotice show={slow} onRetry={retry} />
+        </div>
+      </div>
+    );
+  }
 
   const downloadUrl = book.downloadUrl
     ? `${API_BASE_URL}${book.downloadUrl}`

@@ -36,6 +36,14 @@ export function readPersistedUser(): AuthUser | null {
 
 const initialUser = readPersistedUser();
 
+/**
+ * React StrictMode mounts effects twice in development and a slow mobile
+ * connection can also trigger duplicate calls from several mounts. One shared
+ * promise keeps boot to a single /auth/me request.
+ */
+let initializeInFlight: Promise<void> | null = null;
+let usageInFlight: Promise<void> | null = null;
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: initialUser,
   usage: null,
@@ -44,36 +52,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   status: tokenStore.access ? (initialUser ? 'authenticated' : 'loading') : 'guest',
   initialized: false,
 
-  async initialize() {
-    if (!tokenStore.access) {
-      set({ status: 'guest', initialized: true });
-      return;
-    }
-    const persisted = get().user;
-    try {
-      // Single short attempt: the app already renders from the cached profile,
-      // so a dead mobile connection must not trigger a long retry chain.
-      const response = await api.get<{ user: AuthUser }>('/api/v1/auth/me', { timeout: 8000 });
-      const payload = response.data;
-      persistUser(payload.user);
-      set({ user: payload.user, status: 'authenticated', initialized: true });
-      void get().refreshUsage();
-    } catch (error) {
-      const unauthorized = error instanceof ApiRequestError && error.status === 401;
-      if (unauthorized) {
-        tokenStore.clear();
-        localStorage.removeItem('nf_user');
-        set({ user: null, status: 'guest', initialized: true });
+  initialize() {
+    if (initializeInFlight) return initializeInFlight;
+    const run = async () => {
+      if (!tokenStore.access) {
+        set({ status: 'guest', initialized: true });
         return;
       }
-      // Offline or slow mobile network: keep the cached profile and let the
-      // app render. Individual API calls will surface their own errors.
-      if (persisted) {
-        set({ status: 'authenticated', initialized: true });
-        return;
+      const persisted = get().user;
+      try {
+        // Single short attempt: the app already renders from the cached profile,
+        // so a dead mobile connection must not trigger a long retry chain.
+        const response = await api.get<{ user: AuthUser }>('/api/v1/auth/me', { timeout: 8000 });
+        const payload = response.data;
+        persistUser(payload.user);
+        set({ user: payload.user, status: 'authenticated', initialized: true });
+        void get().refreshUsage();
+      } catch (error) {
+        const unauthorized = error instanceof ApiRequestError && error.status === 401;
+        if (unauthorized) {
+          tokenStore.clear();
+          localStorage.removeItem('nf_user');
+          set({ user: null, status: 'guest', initialized: true });
+          return;
+        }
+        // Offline or slow mobile network: keep the cached profile and let the
+        // app render. Individual API calls will surface their own errors.
+        if (persisted) {
+          set({ status: 'authenticated', initialized: true });
+          return;
+        }
+        set({ status: 'guest', initialized: true });
       }
-      set({ status: 'guest', initialized: true });
-    }
+    };
+    initializeInFlight = run().finally(() => {
+      initializeInFlight = null;
+    });
+    return initializeInFlight;
   },
 
   async login(email, password) {
@@ -125,13 +140,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: null, usage: null, status: 'guest' });
   },
 
-  async refreshUsage() {
-    try {
-      const payload = await api.get<{ usage: UserUsage }>('/api/v1/users/me/usage', { timeout: 10000 });
-      set({ usage: payload.data.usage });
-    } catch {
-      // non-fatal
-    }
+  refreshUsage() {
+    if (usageInFlight) return usageInFlight;
+    usageInFlight = (async () => {
+      try {
+        const payload = await api.get<{ usage: UserUsage }>('/api/v1/users/me/usage', { timeout: 10000 });
+        set({ usage: payload.data.usage });
+      } catch {
+        // non-fatal
+      }
+    })().finally(() => {
+      usageInFlight = null;
+    });
+    return usageInFlight;
   },
 
   setUser(user) {

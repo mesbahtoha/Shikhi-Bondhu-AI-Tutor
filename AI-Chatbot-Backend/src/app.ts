@@ -68,7 +68,19 @@ export function createApp(): Express {
   app.use(mongoSanitize());
 
   // Compression
-  app.use(compression());
+  // SSE responses must never be compressed or buffered: an idle stream would
+  // otherwise be held back by the proxy until it fills a buffer, which looks
+  // like a frozen answer on mobile. Bypass compression for stream endpoints.
+  app.use(
+    compression({
+      filter: (req, res) => {
+        if (req.headers.accept === 'text/event-stream') return false;
+        if (/\/messages(\/(regenerate|continue))?$/.test(req.path) && req.method === 'POST') return false;
+        if (req.path.endsWith('/stream')) return false;
+        return compression.filter(req, res);
+      },
+    })
+  );
 
   // Simple request logger
   app.use((req: Request, res: Response, next: NextFunction) => {

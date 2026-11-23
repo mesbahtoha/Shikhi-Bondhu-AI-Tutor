@@ -18,7 +18,14 @@ function registerMongoLogs(): void {
 let dbPromise: Promise<unknown> | null = null;
 
 function ensureDatabase(): Promise<unknown> {
-  if (!dbPromise) dbPromise = connectDatabase();
+  if (!dbPromise) {
+    // A transient cold-start failure must not permanently poison this lambda
+    // instance: drop the rejected promise so the next request retries.
+    dbPromise = connectDatabase().catch((error) => {
+      dbPromise = null;
+      throw error;
+    });
+  }
   return dbPromise;
 }
 

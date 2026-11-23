@@ -3,10 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { checkPracticeAnswer, getErrorMessage, getPracticeAttempt, savePracticeAnswers, submitPracticeAnswers } from '@/lib/api';
 import { SkeletonBox } from '@/components/ui/Skeleton';
+import { RequestErrorState, SlowLoadingNotice, useSlowLoading } from '@/components/ui/RequestState';
 import type { AttemptQuestion, PracticeAttempt, QuestionResult, StudentQuestionPayload } from '@/types';
 import '@/styles/practice.css';
 
@@ -164,6 +164,8 @@ export function PracticeAttemptPage() {
     void load();
   }, [load]);
 
+  const slowLoad = useSlowLoading(loading);
+
   const save = useCallback(async (nextAnswersOverride?: Record<string, unknown>) => {
     if (!attemptId) return;
     const source = nextAnswersOverride ?? answersRef.current;
@@ -260,6 +262,7 @@ export function PracticeAttemptPage() {
           <SkeletonBox width="60%" height={34} style={{ margin: '10px 0 20px' }} />
           <SkeletonBox width="100%" height={120} />
           <SkeletonBox width="100%" height={120} />
+          <SlowLoadingNotice show={slowLoad} onRetry={() => void load()} />
         </div>
       </div>
     );
@@ -270,10 +273,13 @@ export function PracticeAttemptPage() {
       <div className="pg-app" style={{ paddingBottom: 72 }}>
         <div className="pg-container" style={{ maxWidth: 640, paddingTop: 28 }}>
           <BackToPractice style={{ marginBottom: 16 }} />
-          <EmptyState icon="🧭" title="Practice session not found" description={loadError ?? 'Please start a new practice session.'} />
-          <div style={{ textAlign: 'center', marginTop: 16 }}>
-            <Link to="/practice"><Button variant="secondary">Back to practice</Button></Link>
-          </div>
+          <RequestErrorState
+            icon="🧭"
+            title="Could not load this practice session"
+            description={loadError ?? 'Please try again. Your answers are saved on the server once the session loads.'}
+            onRetry={() => void load()}
+            secondaryAction={<Link to="/practice"><Button variant="secondary">Back to practice</Button></Link>}
+          />
         </div>
       </div>
     );

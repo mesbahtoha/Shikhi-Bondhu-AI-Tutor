@@ -46,16 +46,28 @@ export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
 ).replace(/\/+$/, '');
 
+/**
+ * Every normal UI call is bounded. A dead or heavily throttled cellular
+ * connection must fail in seconds so the page can show its retry state instead
+ * of leaving a skeleton spinning. Long-running AI/upload calls override this
+ * explicitly (see streamPost/apiUpload/tutor helpers).
+ */
+export const DEFAULT_API_TIMEOUT_MS = 15000;
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  // Shorter than the old 60s so a dead mobile connection fails (and retries)
-  // instead of leaving the UI spinning for a minute. AI/upload calls override
-  // this with their own longer timeouts.
-  timeout: 20000,
+  timeout: DEFAULT_API_TIMEOUT_MS,
   headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // Fail immediately when the OS already knows there is no connection. This
+  // avoids waiting for the full timeout on a mobile data drop.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return Promise.reject(
+      new ApiRequestError('You appear to be offline. Check your mobile data or Wi-Fi and try again.', 0)
+    );
+  }
   const token = tokenStore.access;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   // Practice works for signed-out visitors too. The header is only sent to
@@ -85,6 +97,12 @@ async function refreshAccessToken(): Promise<string> {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiError>) => {
+    // Aborted searches/unmounts must never be retried or reported as a
+    // network failure: they are intentional and should stop immediately.
+    if (axios.isCancel(error)) {
+      throw new ApiRequestError('Request canceled', 0, { canceled: true });
+    }
+
     const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
 
     const isAuthEndpoint =
@@ -144,37 +162,65 @@ api.interceptors.response.use(
 
 export class ApiRequestError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** True when the request was intentionally aborted (unmount, new search, Stop). */
+  canceled: boolean;
+  constructor(message: string, status: number, options?: { canceled?: boolean }) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
+    this.canceled = options?.canceled ?? false;
   }
+}
+
+/** True for axios cancellations and DOM AbortController aborts. */
+export function isAbortError(error: unknown): boolean {
+  if (error instanceof ApiRequestError) return error.canceled;
+  if (axios.isCancel(error)) return true;
+  const candidate = error as { name?: string; code?: string } | null;
+  return (
+    candidate?.name === 'CanceledError' ||
+    candidate?.name === 'AbortError' ||
+    candidate?.code === 'ERR_CANCELED'
+  );
 }
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 /** Network failures and transient gateway errors are worth one quick retry. */
 function isRetryableRequestError(error: unknown): boolean {
+  if (isAbortError(error)) return false;
   if (error instanceof ApiRequestError) {
-    return error.status === 0 || error.status === 408 || error.status === 502 || error.status === 503 || error.status === 504;
+    return error.status === 0 || error.status === 408 || error.status === 425 || error.status === 429 || error.status === 502 || error.status === 503 || error.status === 504;
   }
   return false;
 }
 
+/** Exponential backoff with jitter avoids a thundering herd after a mobile blip. */
+function retryDelayMs(attempt: number): number {
+  return 500 * 2 ** attempt + Math.floor(Math.random() * 250);
+}
+
 /**
  * Idempotent GETs retry once on flaky mobile connections. This avoids a single
- * dropped packet showing an error page or leaving a route half-loaded.
+ * dropped packet showing an error page or leaving a route half-loaded, while
+ * still failing fast enough for a clear Retry button.
  */
 export async function apiGet<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  const maxAttempts = 2;
   let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       const { data } = await api.get(url, config);
       return data as T;
     } catch (error) {
       lastError = error;
-      if (attempt === 1 || !isRetryableRequestError(error)) throw error;
-      await sleep(400);
+      const canRetry =
+        attempt < maxAttempts - 1 &&
+        !config?.signal?.aborted &&
+        isRetryableRequestError(error) &&
+        (typeof navigator === 'undefined' || navigator.onLine !== false);
+      if (!canRetry) throw error;
+      await sleep(retryDelayMs(attempt));
     }
   }
   throw lastError;
@@ -211,13 +257,28 @@ export async function apiDelete<T>(url: string, config?: AxiosRequestConfig): Pr
 }
 
 export function getErrorMessage(error: unknown): string {
+  const offline =
+    typeof navigator !== 'undefined' && navigator.onLine === false;
   if (error instanceof ApiRequestError) {
+    if (error.canceled) return 'The request was canceled.';
+    if (error.status === 0 && offline) {
+      return 'You appear to be offline. Check your mobile data or Wi-Fi and try again.';
+    }
+    if (error.status === 0 && /timed? ?out|timeout/i.test(error.message)) {
+      return 'The server took too long to respond. Please check your connection and try again.';
+    }
     if (error.status === 0 || /network error|timeout|failed to fetch/i.test(error.message)) {
       return 'Network problem. Please check your internet connection and try again.';
     }
     return error.message;
   }
   if (axios.isAxiosError(error)) {
+    if (offline) {
+      return 'You appear to be offline. Check your mobile data or Wi-Fi and try again.';
+    }
+    if (!error.response && /timed? ?out|timeout/i.test(error.message)) {
+      return 'The server took too long to respond. Please check your connection and try again.';
+    }
     if (!error.response || /network error|timeout|failed to fetch/i.test(error.message)) {
       return 'Network problem. Please check your internet connection and try again.';
     }
@@ -483,6 +544,9 @@ export async function streamPost(
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal
 ): Promise<void> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new ApiRequestError('You appear to be offline. Check your mobile data or Wi-Fi and try again.', 0);
+  }
   const token = tokenStore.access;
   const controller = new AbortController();
   let timedOut = false;

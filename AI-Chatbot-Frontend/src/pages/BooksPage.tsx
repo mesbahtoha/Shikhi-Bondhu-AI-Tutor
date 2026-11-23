@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listBooks } from '@/lib/tutor';
+import { getErrorMessage } from '@/lib/api';
 import { Mascot } from '@/components/landing/Mascot';
+import { RequestErrorState, SlowLoadingNotice, useSlowLoading } from '@/components/ui/RequestState';
 import { useLang } from '@/lib/i18n';
 import type { BookInfo } from '@/types';
 
@@ -41,6 +43,8 @@ export function BooksPage() {
   const [sort, setSort] = useState<'title' | 'subject' | 'recent'>('title');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     const id = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 350);
@@ -51,14 +55,18 @@ export function BooksPage() {
     const controller = new AbortController();
     let active = true;
     setLoading(true);
+    setError(null);
     listBooks({ search: debounced || undefined }, controller.signal)
       .then((nextBooks) => {
-        if (active) setBooks(nextBooks);
+        if (active) {
+          setBooks(nextBooks);
+          setError(null);
+        }
       })
-      .catch(() => {
-        // Aborted searches and offline failures both land here; keep the last
-        // useful list instead of flashing a false "no books" state.
-        if (active) setBooks((current) => current);
+      .catch((err: unknown) => {
+        // Aborted searches are expected. A real failure keeps the last useful
+        // list and surfaces a retry action instead of a false "no books" state.
+        if (active && !controller.signal.aborted) setError(getErrorMessage(err));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -67,7 +75,10 @@ export function BooksPage() {
       active = false;
       controller.abort();
     };
-  }, [debounced]);
+  }, [debounced, reloadTick]);
+
+  const slow = useSlowLoading(loading);
+  const retry = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
   const subjects = useMemo(() => Array.from(new Set(books.map((b) => b.subject).filter(Boolean))), [books]);
   const curricula = useMemo(() => Array.from(new Set(books.map((b) => b.curriculum).filter(Boolean))), [books]);
@@ -120,15 +131,30 @@ export function BooksPage() {
           <p className="muted small">{filtered.length} {bn ? 'টি বই' : 'books'} • {bn ? 'পাতা' : 'Page'} {current}/{pages}</p>
         </div>
 
-        {loading && <SkeletonCards />}
-        {!loading && filtered.length === 0 && (
+        {error && books.length > 0 && (
+          <SlowLoadingNotice show message={error} onRetry={retry} />
+        )}
+
+        {loading && books.length === 0 && <SkeletonCards />}
+        {slow && <SlowLoadingNotice show onRetry={retry} />}
+        {!loading && error && books.length === 0 && (
+          <div className="pg-card" style={{ padding: 8 }}>
+            <RequestErrorState
+              icon="📚"
+              title={bn ? 'বই লোড করা যায়নি' : 'Could not load books'}
+              description={error}
+              onRetry={retry}
+            />
+          </div>
+        )}
+        {!loading && !error && filtered.length === 0 && (
           <div className="pg-card empty-card">
             <Mascot size={64} mood="thinking" />
             <p className="muted">{bn ? 'এখনো প্রকাশিত বই নেই। তবুও শিখি বন্ধুকে জিজ্ঞেস করতে পারো।' : 'No published book yet. You can still ask Shikhi Bondhu.'}</p>
             <Link to="/tutor" className="pg-btn-secondary">{bn ? 'তবুও জিজ্ঞেস করো' : 'Ask anyway'}</Link>
           </div>
         )}
-        {!loading && visible.length > 0 && (
+        {visible.length > 0 && (
           <div className="book-grid">
             {visible.map((b) => (
               <article key={b._id} className="pg-card book-card hover-lift">

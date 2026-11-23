@@ -30,6 +30,15 @@ async function startServer(): Promise<void> {
       runBootJobs();
     });
 
+    // Hard bounds so a stalled mobile client can never hold a socket (and the
+    // memory behind an abandoned SSE stream) open indefinitely. The AI stream
+    // itself is capped at 45s by the router timeout, so 120s leaves headroom.
+    server.requestTimeout = 120_000;
+    server.headersTimeout = 30_000;
+    // Slightly longer than typical proxy idle timeouts so keep-alive reuse
+    // does not race a proxy closing the connection first.
+    server.keepAliveTimeout = 65_000;
+
     // Graceful shutdown
     const shutdown = async (signal: string) => {
       log.info(`Received ${signal}, shutting down gracefully...`);

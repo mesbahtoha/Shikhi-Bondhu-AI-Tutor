@@ -57,11 +57,31 @@ export function PublicLayout() {
     };
   }, []);
 
-  // Warm the lazy /docs chunk in the background once the link is visible.
+  // Warm the lazy /docs chunk in the background once the link is visible, but
+  // only when the connection can spare the bandwidth. On metered or slow
+  // cellular links this prefetch competes with the page the learner is
+  // actually waiting for; hover/tap still warms it on demand.
   useEffect(() => {
     if (!docsVisible) return;
-    const timer = window.setTimeout(prefetchDocsData, 600);
-    return () => window.clearTimeout(timer);
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }
+    ).connection;
+    if (connection?.saveData) return;
+    if (connection?.effectiveType && connection.effectiveType !== '4g') return;
+
+    let cancelled = false;
+    const run = () => {
+      if (!cancelled) prefetchDocsData();
+    };
+    const idleHandle =
+      typeof window.requestIdleCallback === 'function'
+        ? window.requestIdleCallback(run, { timeout: 3000 })
+        : window.setTimeout(run, 2000);
+    return () => {
+      cancelled = true;
+      if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleHandle);
+      else window.clearTimeout(idleHandle);
+    };
   }, [docsVisible]);
 
   const warmDocs = () => {

@@ -22,7 +22,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Form';
 import { ChatSkeleton } from '@/components/ui/Skeleton';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { API_BASE_URL, apiPost, getErrorMessage } from '@/lib/api';
+import { API_BASE_URL, ApiRequestError, apiPost, getErrorMessage } from '@/lib/api';
+import { RequestErrorState, SlowLoadingNotice, useSlowLoading } from '@/components/ui/RequestState';
 import { copyText } from '@/lib/clipboard';
 import { makeTutorQuiz } from '@/lib/tutor';
 import type { QuizPreview, TutorSource } from '@/types';
@@ -82,6 +83,8 @@ export function TutorChatWorkspace() {
   const renameConversation = useChatStore((s) => s.renameConversation);
 
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const [creating, setCreating] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -125,6 +128,8 @@ export function TutorChatWorkspace() {
   useEffect(() => {
     if (conversationId) return;
     let active = true;
+    setLoadError(null);
+    setLoading(true);
     void loadConversations()
       .then(async () => {
         if (!active) return;
@@ -137,25 +142,40 @@ export function TutorChatWorkspace() {
           const created = await createConversation('New chat');
           if (active) navigate(`/tutor/${created._id}`, { replace: true });
         } catch (error) {
-          if (active) toast.error(getErrorMessage(error));
+          if (active) setLoadError(getErrorMessage(error));
         }
       })
-      .catch(() => {
-        // Offline: keep the composer available and let the learner retry.
+      .catch((error: unknown) => {
+        // Offline: show an explicit retry instead of leaving the workspace on
+        // an endless skeleton with a disabled composer.
+        if (active) setLoadError(getErrorMessage(error));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [conversationId, loadConversations, createConversation, navigate]);
+  }, [conversationId, loadConversations, createConversation, navigate, reloadTick]);
 
   // Load the selected conversation and keep the history list fresh.
   useEffect(() => {
     if (!conversationId) return;
     let active = true;
     setLoading(true);
+    setLoadError(null);
     loadConversation(conversationId)
-      .catch(() => {
-        if (active) navigate('/tutor', { replace: true });
+      .catch((error: unknown) => {
+        if (!active) return;
+        // A deleted/missing conversation should send the learner back to their
+        // latest chat. Network and timeout failures keep this route open and
+        // show a retry panel instead of an endless skeleton.
+        if (error instanceof ApiRequestError && error.status === 404) {
+          navigate('/tutor', { replace: true });
+          return;
+        }
+        setLoadError(getErrorMessage(error));
+        setLoading(false);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -166,15 +186,17 @@ export function TutorChatWorkspace() {
     return () => {
       active = false;
     };
-  }, [conversationId, loadConversation, loadConversations, navigate]);
+  }, [conversationId, loadConversation, loadConversations, navigate, reloadTick]);
 
   // The selected chat disappeared (deleted here or in another tab).
   useEffect(() => {
-    if (!conversationId || loading) return;
+    if (!conversationId || loading || loadError) return;
     if (current && current.conversation._id !== conversationId) {
       navigate('/tutor', { replace: true });
     }
-  }, [conversationId, loading, current, navigate]);
+  }, [conversationId, loading, loadError, current, navigate]);
+
+  const slowLoad = useSlowLoading(loading && !loadError);
 
   // Follow the conversation while the learner is at the bottom. During
   // streaming this runs every ~80 ms, so use an instant scroll on the next
@@ -416,8 +438,18 @@ export function TutorChatWorkspace() {
         </header>
 
         <div className="tutor-scroll scroll-thin" ref={scrollRef} onScroll={handleScroll}>
-          {!ready || loading ? (
-            <ChatSkeleton />
+          {loadError ? (
+            <RequestErrorState
+              icon="📡"
+              title="Could not load this chat"
+              description={loadError}
+              onRetry={() => setReloadTick((tick) => tick + 1)}
+            />
+          ) : !ready || loading ? (
+            <>
+              <ChatSkeleton />
+              <SlowLoadingNotice show={slowLoad} onRetry={() => setReloadTick((tick) => tick + 1)} />
+            </>
           ) : messages.length === 0 ? (
             <div className="tutor-empty">
               <div className="tutor-empty-icon" aria-hidden="true">
@@ -476,7 +508,7 @@ export function TutorChatWorkspace() {
               }
               isStreaming={isStreaming}
               onStop={session.stop}
-              disabled={!ready || loading}
+              disabled={!ready || loading || !!loadError}
             />
           </div>
         </div>

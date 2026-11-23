@@ -32,6 +32,33 @@ try {
 
 initTheme();
 
+/**
+ * This app ships no service worker. A service worker registered by an older
+ * deployment would keep serving stale HTML/JS from CacheStorage, which on a
+ * flaky mobile connection looks exactly like a permanent hang. Remove any
+ * legacy registration in the background so it can never block a reload.
+ */
+async function cleanupLegacyServiceWorkers() {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    if (registrations.length === 0) return;
+    await Promise.allSettled(registrations.map((registration) => registration.unregister()));
+    if (typeof caches !== 'undefined') {
+      const keys = await caches.keys();
+      await Promise.allSettled(keys.map((key) => caches.delete(key)));
+    }
+  } catch {
+    // Non-fatal: the app works without a service worker.
+  }
+}
+
+if (document.readyState === 'complete') {
+  void cleanupLegacyServiceWorkers();
+} else {
+  window.addEventListener('load', () => void cleanupLegacyServiceWorkers(), { once: true });
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>

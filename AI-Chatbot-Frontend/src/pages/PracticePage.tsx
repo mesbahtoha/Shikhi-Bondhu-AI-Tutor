@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonBox } from '@/components/ui/Skeleton';
 import { getErrorMessage, listPracticeBooks, listPracticeChapters, startPracticeAttempt } from '@/lib/api';
+import { RequestErrorState, SlowLoadingNotice, useSlowLoading } from '@/components/ui/RequestState';
 import type { PracticeBookSummary, PracticeChapterSummary, PracticeQuestionType, PracticeMode } from '@/types';
 import '@/styles/practice.css';
 
@@ -25,11 +26,14 @@ export function PracticePage() {
   const [booksError, setBooksError] = useState<string | null>(null);
   const [bookId, setBookId] = useState<string>('');
   const [chapters, setChapters] = useState<PracticeChapterSummary[] | null>(null);
+  const [chaptersError, setChaptersError] = useState<string | null>(null);
+  const [chaptersReload, setChaptersReload] = useState(0);
   const [allSelected, setAllSelected] = useState(true);
   const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
   const [questionType, setQuestionType] = useState<PracticeQuestionType | null>(null);
   const [mode, setMode] = useState<PracticeMode | null>(null);
   const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const loadBooks = useCallback(async () => {
     setBooks(null);
@@ -54,6 +58,7 @@ export function PracticePage() {
     if (!bookId) return;
     let cancelled = false;
     setChapters(null);
+    setChaptersError(null);
     setAllSelected(true);
     setSelectedChapterIds([]);
     void (async () => {
@@ -61,13 +66,18 @@ export function PracticePage() {
         const { chapters } = await listPracticeChapters(bookId);
         if (!cancelled) setChapters(chapters);
       } catch (error) {
-        if (!cancelled) toast.error(getErrorMessage(error));
+        // A failed chapter request used to leave the step on an infinite
+        // skeleton. Keep an explicit error + retry instead.
+        if (!cancelled) setChaptersError(getErrorMessage(error));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [bookId]);
+  }, [bookId, chaptersReload]);
+
+  const slowBooks = useSlowLoading(books === null && !booksError);
+  const slowChapters = useSlowLoading(chapters === null && !!bookId && !chaptersError);
 
   const toggleAllChapters = () => {
     if (!chapters) return;
@@ -94,6 +104,7 @@ export function PracticePage() {
       return;
     }
     setStarting(true);
+    setStartError(null);
     try {
       const { attempt } = await startPracticeAttempt({
         bookId,
@@ -103,7 +114,9 @@ export function PracticePage() {
       });
       navigate(`/practice/attempt/${attempt._id}`);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      setStartError(message);
+      toast.error(message);
     } finally {
       setStarting(false);
     }
@@ -148,6 +161,7 @@ export function PracticePage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <SkeletonBox width="100%" height={44} />
                   <SkeletonBox width="70%" height={44} />
+                  <SlowLoadingNotice show={slowBooks} onRetry={() => void loadBooks()} />
                 </div>
               ) : books.length === 0 ? (
                 <EmptyState icon="📚" title="No books yet" description="Ask your teacher to publish a book first. Practice sets will appear here later." />
@@ -191,10 +205,20 @@ export function PracticePage() {
             <>
               <h2 style={{ marginTop: 0 }}>Step 2: Choose chapters</h2>
               {bookId ? (
-                chapters === null ? (
+                chaptersError ? (
+                  <div>
+                    <RequestErrorState
+                      icon="📖"
+                      title="Could not load chapters"
+                      description={chaptersError}
+                      onRetry={() => setChaptersReload((tick) => tick + 1)}
+                    />
+                  </div>
+                ) : chapters === null ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <SkeletonBox width="100%" height={44} />
                     <SkeletonBox width="60%" height={44} />
+                    <SlowLoadingNotice show={slowChapters} onRetry={() => setChaptersReload((tick) => tick + 1)} />
                   </div>
                 ) : chapters.length === 0 ? (
                   <EmptyState icon="📖" title="No chapters found" description="This book has no ingested chapters yet." />
@@ -285,12 +309,20 @@ export function PracticePage() {
                   <span style={{ display: 'block', marginTop: 6, color: 'var(--text-secondary)', fontSize: 13 }}>Answer all questions together and submit before the timer ends.</span>
                 </button>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, gap: 12, flexWrap: 'wrap' }}>
                 <Button variant="secondary" onClick={() => setStep(3)}>Back</Button>
                 <Button onClick={() => void start()} disabled={!mode || starting}>
                   {starting ? 'Starting…' : mode === 'exam' ? 'Start Exam' : 'Start Practice'}
                 </Button>
               </div>
+              {startError && (
+                <p role="alert" style={{ marginTop: 10, color: 'var(--danger-text)', fontSize: 13.5 }}>
+                  {startError}{' '}
+                  <button type="button" className="pg-btn-secondary" style={{ width: 'auto', minHeight: 34, padding: '4px 12px' }} onClick={() => void start()} disabled={starting}>
+                    Retry
+                  </button>
+                </p>
+              )}
             </>
           )}
         </div>

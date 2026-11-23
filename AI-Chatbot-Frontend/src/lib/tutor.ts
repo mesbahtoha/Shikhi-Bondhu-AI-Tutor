@@ -24,7 +24,9 @@ export async function guestChat(
     ...(options?.language ? { language: options.language } : {}),
     ...(options?.subject ? { subject: options.subject } : {}),
     ...(options?.bookId ? { bookId: options.bookId } : {}),
-  }, { timeout: 90000, signal: options?.signal });
+    // The serverless API caps requests at 60s. Abort before that so the child
+    // sees a retryable message from the app instead of a dropped connection.
+  }, { timeout: 50000, signal: options?.signal });
   return payload.tutor;
 }
 
@@ -56,7 +58,7 @@ export async function tutorChat(message: string, options?: TutorChatOptions): Pr
       ...(options?.subject ? { subject: options.subject } : {}),
       ...(options?.bookId ? { bookId: options.bookId } : {}),
     },
-    { signal: options?.signal, timeout: 120000 }
+    { signal: options?.signal, timeout: 55000 }
   );
   return payload.tutor;
 }
@@ -69,7 +71,7 @@ export async function makeTutorQuiz(topic: string, options?: { language?: string
       ...(options?.language ? { language: options.language } : {}),
       ...(options?.subject ? { subject: options.subject } : {}),
       ...(options?.bookId ? { bookId: options.bookId } : {}),
-    }, { timeout: 60000 });
+    }, { timeout: 50000 });
   } catch {
     return null;
   }
