@@ -127,7 +127,19 @@ async function refreshAccessToken(): Promise<string> {
 }
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // When the API proxy is missing or misconfigured, Vercel's SPA fallback
+    // answers with index.html and status 200. Turn that into a real error so a
+    // page cannot render a phantom empty state.
+    const contentType = String(response.headers['content-type'] || '');
+    if (response.config.url?.startsWith('/api/') && contentType.includes('text/html')) {
+      throw new ApiRequestError(
+        'The server returned a web page instead of API data. Please try again.',
+        502
+      );
+    }
+    return response;
+  },
   async (error: AxiosError<ApiError>) => {
     // Aborted searches/unmounts must never be retried or reported as a
     // network failure: they are intentional and should stop immediately.
@@ -617,6 +629,14 @@ export async function streamPost(
         // ignore parse errors
       }
       throw new ApiRequestError(message, response.status);
+    }
+
+    // A proxy/misconfigured base URL can answer with the SPA HTML instead of an
+    // event stream. Surface that as an error instead of silently completing an
+    // empty answer.
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('text/event-stream')) {
+      throw new ApiRequestError('The server returned an unexpected response. Please try again.', 502);
     }
 
     const reader = response.body?.getReader();
