@@ -1021,13 +1021,19 @@ Expected: `{ "success": true, "status": "ok" }`.
 - **Framework Preset:** Vite
 - **Build Command:** `npm run build`
 - **Output Directory:** `dist`
-- **Rewrites:** SPA fallback to `/index.html` (already in `vercel.json`)
+- **Rewrites:** SPA fallback to `/index.html`, plus `/api/*` proxied to the backend
+  (already in `vercel.json`). Serving the API from the frontend origin avoids a second
+  TLS connection and CORS preflight that many mobile carriers handle poorly.
 
 Required environment:
 
 | Variable | Value |
 | --- | --- |
-| `VITE_API_BASE_URL` | `https://<backend>.vercel.app` (no trailing slash required) |
+| `VITE_API_BASE_URL` | `http://localhost:3000` (local dev only) |
+| `VITE_API_SAME_ORIGIN` | Optional. `false` forces `VITE_API_BASE_URL` in production builds. |
+
+Production builds default to same-origin `/api`; update the rewrite destination in
+`AI-Chatbot-Frontend/vercel.json` if the backend deployment URL changes.
 
 ### Stale-backend warning
 

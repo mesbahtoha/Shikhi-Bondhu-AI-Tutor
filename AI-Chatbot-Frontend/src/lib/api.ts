@@ -42,9 +42,41 @@ export const tokenStore = {
   },
 };
 
-export const API_BASE_URL = (
+const configuredBaseUrl = (
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
 ).replace(/\/+$/, '');
+
+/** Local dev, Vite preview and LAN testing still call the backend directly. */
+function isLocalOrLanHost(host: string): boolean {
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '[::1]' ||
+    host.endsWith('.local') ||
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+  );
+}
+
+/**
+ * On the deployed app API calls go to the frontend's own origin and Vercel
+ * proxies /api/* to the backend (see vercel.json).
+ *
+ * Mobile carriers frequently fail to open a second TLS connection to the
+ * backend's separate hostname even though the static app loads fine. Routing
+ * through the frontend origin means one host, one connection and no CORS
+ * preflight, which is dramatically more reliable on cellular data.
+ *
+ * Local/LAN development still uses VITE_API_BASE_URL. Set
+ * VITE_API_SAME_ORIGIN=false to force the absolute backend URL in production.
+ */
+export const API_BASE_URL = (() => {
+  if (typeof window === 'undefined') return configuredBaseUrl;
+  if (isLocalOrLanHost(window.location.hostname)) return configuredBaseUrl;
+  if (import.meta.env.VITE_API_SAME_ORIGIN === 'false') return configuredBaseUrl;
+  return '';
+})();
 
 /**
  * Every normal UI call is bounded. A dead or heavily throttled cellular

@@ -18,7 +18,8 @@ export function StaleBackendNotice({ feature, onRetry }: { feature: string; onRe
         ব্যাকএন্ড পুনরায় ডিপ্লয় করো, অথবা সঠিক সার্ভার ব্যবহার করো।
       </p>
       <p className="text-xs text-muted" style={{ marginBottom: 12 }}>
-        সংযুক্ত সার্ভার: <code>{API_BASE_URL}</code>
+        সংযুক্ত সার্ভার:{' '}
+        <code>{API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'same origin')}</code>
       </p>
       {onRetry && (
         <Button size="sm" variant="secondary" onClick={onRetry}>

@@ -21,13 +21,16 @@ function addResourceHint(rel: 'preconnect' | 'dns-prefetch', href: string, cross
 }
 
 // Warm up the API connection early, which saves a DNS/TLS round-trip on slow
-// mobile networks where every handshake is expensive.
-try {
-  const apiOrigin = new URL(API_BASE_URL).origin;
-  addResourceHint('preconnect', apiOrigin, true);
-  addResourceHint('dns-prefetch', apiOrigin);
-} catch {
-  // ignore malformed API URLs
+// mobile networks where every handshake is expensive. Deployed builds call the
+// API on their own origin (Vercel proxies /api), so there is nothing to warm.
+if (API_BASE_URL) {
+  try {
+    const apiOrigin = new URL(API_BASE_URL).origin;
+    addResourceHint('preconnect', apiOrigin, true);
+    addResourceHint('dns-prefetch', apiOrigin);
+  } catch {
+    // ignore malformed API URLs
+  }
 }
 
 initTheme();
